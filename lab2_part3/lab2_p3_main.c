@@ -102,7 +102,7 @@ int main(void)
     msp_printf("     The union = 0x%x bytes\r\n", sizeof(union_var));
     msp_printf("\r\n",0);
 
-    msp_printf("Dumping data values from Uino\r\n",0);
+    msp_printf("Dumping data values from Union\r\n",0);
     msp_printf("--------------------------------------------------------------------\r\n",0);
     msp_printf("  union unsigned long int LA = 0x%x bytes\r\n", union_var.LA);
     msp_printf("    union signed long int LB = 0x%x bytes\r\n", union_var.LB);
