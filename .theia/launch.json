@@ -12,6 +12,12 @@
             "type": "ccs-debug",
             "request": "launch",
             "project": "default_project"
+        },
+        {
+            "name": "lab3_part1",
+            "type": "ccs-debug",
+            "request": "launch",
+            "project": "lab3_part1"
         }
     ]
 }
