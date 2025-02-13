@@ -41,7 +41,6 @@
 #include "LaunchPad.h"
 #include "uart.h"
 
-
 //-----------------------------------------------------------
 // Define function prototypes used by the program
 //-----------------------------------------------------------
@@ -73,7 +72,6 @@ bool check_bit(uint16_t reg_value, uint16_t bit_mask);
 //-----------------------------------------------------------------------------
 
 uint16_t test_reg16 = 0x0000;
-
 
 int main(void)
 {
@@ -147,7 +145,7 @@ int main(void)
 
   // enter your code here for problem 4
   reg_value = test_reg16;                           
-  reg_value = set_bit(reg_value, A3_BIT_MASK);
+  reg_value = set_bit(reg_value, A3_BIT_MASK | A2_BIT_MASK | A1_BIT_MASK | A0_BIT_MASK);
   test_reg16 = reg_value;                    
 
   msp_printf("    --> Test reg = 0x%04X\r\n", test_reg16);
@@ -215,8 +213,20 @@ int main(void)
   // ***************************************************************************
   msp_printf("PROBLEM 8: Testing bit A2\r\n", 0);
 
+  reg_value = test_reg16;
   // enter your code here for problem 8
-  
+  if (check_bit(reg_value, A2_BIT_MASK))
+  {
+    msp_printf("    --> Bit A2=1 so clearing it\r\n", 0);
+    reg_value = clear_bit(reg_value, A2_BIT_MASK);
+  }
+  else
+  {
+    msp_printf("    --> Bit A2=0 so setting it\r\n", 0);
+    reg_value = set_bit(reg_value, A2_BIT_MASK);
+  }
+  test_reg16 = reg_value;
+
   msp_printf("    --> Test reg = 0x%04X\r\n", test_reg16);
   msp_printf("\r\n",0);
 
@@ -335,3 +345,36 @@ bool check_bit(uint16_t reg_value, uint16_t bit_mask)
 {
     return (reg_value & bit_mask) != 0;
 }
+
+//-----------------------------------------------------------------------------
+// DESCRIPTION:
+//      This function formats an integer value into a string according to a given
+//      format and sends the resulting string to a serial port.
+//
+// INPUT PARAMATERS:
+//      buffer: A format string used to format the integer value. It follows the
+//              format specifiers used by `sprintf`.
+//      value:  The integer value to be formatted and included in the formatted
+//              string.
+//
+// OUTPUT PARAMETERS:
+//      none
+//
+// RETURN:
+//      none
+//-----------------------------------------------------------------------------
+void msp_printf(char* buffer, unsigned int value)
+{
+    unsigned int i = 0;
+    unsigned int len = 0;
+    char string[80];
+
+    len = sprintf(string, buffer, value);
+
+    //Walk through array to send each character to serial port
+    for (i = 0; i< len; i++)
+    {
+        UART_out_char(string[i]);
+    } /* for */
+
+} /* msp printf */
