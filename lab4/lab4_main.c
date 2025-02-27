@@ -53,7 +53,7 @@ int main(void)
     int counter;
     int LDcounter;
 
-
+    
     //PART 1
     led_enable();       //Enables anode side
     leds_on(0x3C);      //Enables parts of the cathode side (00111100)
@@ -68,45 +68,83 @@ int main(void)
 
     for (counter = 0; counter < 5; counter++)   //Loop sequence 5 times
     {
-        for (LDcounter = 0; LDcounter < 8; LDcounter++){     //Enable LED for .2 seconds. Cycle from LED 0 to 7
+        for (LDcounter = LED_BAR_LD0_IDX; LDcounter <= LED_BAR_LD7_IDX; LDcounter++) //Enable LED for .2 seconds. Cycle from LED 0 to 7
+        {     
             led_on(LDcounter);
             msec_delay(200);
-            led_off(LDcounter);
+            leds_off();
         }
 
-        for (LDcounter = 6; LDcounter > 0; LDcounter--){     //Enable LED for .2 seconds. Cycle from LED 6 to 0
+        for (LDcounter = LED_BAR_LD6_IDX; LDcounter > LED_BAR_LD0_IDX; LDcounter--)     //Enable LED for .2 seconds. Cycle from LED 6 to 0
+        { 
             led_on(LDcounter);
             msec_delay(200);
-            led_off(LDcounter);
+            leds_off();
         }
     }
+    led_on(LED_BAR_LD0_IDX);
+    msec_delay(200);
+    leds_off();
 
-
-    //PART 3 - ********EXTREMELY BAD AND ONLY COUNTS TO 8
+    
+    //PART 3 - ********NOT A METHOD ETCC. DOES WORK THO
     msec_delay(500);   //Pause for .5 seconds before starting Part 3
-
-    for (counter = 0; counter < 5; counter++)   //Loop sequence 2 times
+    
+    for (counter = 0; counter < 2; counter++)         //Loop sequence 2 times
     {
-        led_on(0);
-        msec_delay(5);
-        led_off(0);
-        led_on(1);
-        msec_delay(5);
-        led_on(0);
-        msec_delay(5);
-        led_on(2);
-        led_off(1);
-        led_off(0);
-        msec_delay(5);
-        led_on(0);
-        msec_delay(5);
-        led_on(1);
-        msec_delay(5);
-        led_on(3);
-        led_off(2);
-        led_off(1);
-        led_off(0);
+        for (LDcounter = 0; LDcounter < 256; LDcounter++)       //Counts to to 11111111 in binary
+        {
+            leds_on(LDcounter);
+            msec_delay(100);        //Enable current binary value for 0.10 seconds
+        }
     }
+
+    
+
+    //PART 4
+    msec_delay(500);   //Pause for .5 seconds before starting Part 4
+    leds_off();
+    led_disable();
+    seg7_init();
+    seg7_on(0x38, SEG7_DIG0_ENABLE_IDX); // DIG0 will display the 'L'
+
+
+    
+    //PART 5
+    msec_delay(500);   //Pause for .5 seconds before starting Part 4
+    seg7_off();
+
+    
+    for (counter = 0; counter < 4; counter++)       //Loop 4 times
+    {
+        seg7_on(0x66, SEG7_DIG2_ENABLE_IDX);        //make 66 into a variable. Also could use hex 4
+        msec_delay(3000);
+        seg7_off();
+        msec_delay(2000);
+    }
+    
+
+
+    //PART 6          ****MUST USE VARIABLES NOT HEX NUMBERS> THIS GOES FOR EVERYTHING  ***ALSO YOU NEED ANOTHER LOOP WITH AN ARRAY. IT"S IN THE LECTURE SLIDES
+    msec_delay(500);    //Pause for .5 seconds before starting Part 4
+
+    for (counter = 0; counter < 200; counter++)
+    {
+        msec_delay(5);
+        seg7_hex(0xC, SEG7_DIG0_ENABLE_IDX);
+        msec_delay(5);
+        seg7_hex(0xA, SEG7_DIG1_ENABLE_IDX);
+        msec_delay(5);
+        seg7_hex(0xF, SEG7_DIG2_ENABLE_IDX);
+        msec_delay(5);
+        seg7_hex(0xE, SEG7_DIG3_ENABLE_IDX);
+    }
+
+    
+    leds_off();
+    seg7_off();
+
+
 
 
 
@@ -114,4 +152,5 @@ int main(void)
  //while (1);
 
 } /* main */
+
 
