@@ -1,16 +1,23 @@
 //*****************************************************************************
 //*****************************    C Source Code    ***************************
 //*****************************************************************************
-//  DESIGNER NAME:  TBD
+//  DESIGNER NAME:  Connor Blum
 //
-//       LAB NAME:  TBD
+//       LAB NAME:  Lab 4
 //
 //      FILE NAME:  lab4_main.c
 //
 //-----------------------------------------------------------------------------
 //
 // DESCRIPTION:
-//    This program serves as a ... 
+//    This program serves as a tester for the LED Bar and 7-Segment display.
+//    There are 6 tests:
+//      - Test 1: Enable LED Bar LD2 - LD5
+//      - Test 2: Sequence up and down from LD0 to LD7, 4 times
+//      - Test 3: Binary count from 00000000 to 11111111, 2 times
+//      - Test 4: Display "L" on 7-segment display
+//      - Test 5: Display "4" on 7-segment display, 4 times
+//      - Test 6: DIsplay "CAFE" on 7-segment display
 //
 //*****************************************************************************
 //*****************************************************************************
