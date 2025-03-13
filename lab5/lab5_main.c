@@ -243,5 +243,3 @@ void run_lab5_part4(void)
 void debounce() {
     msec_delay(10);
 }
-
-
