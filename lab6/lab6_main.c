@@ -1,7 +1,7 @@
 //*****************************************************************************
 //*****************************    C Source Code    ***************************
 //*****************************************************************************
-//  DESIGNER NAME:  TBD
+//  DESIGNER NAME:  Connor Blum
 //
 //       LAB NAME:  Lab 6
 //
@@ -10,7 +10,12 @@
 //-----------------------------------------------------------------------------
 //
 // DESCRIPTION:
-//    This program serves as a ... 
+//    This program serves as a tester for the LCD screen
+//    There are 4 tests:
+//      - Test 1: Display the alphabet, demonstrating text-wrapping
+//      - Test 2: Display numbers, demonstrating positioning & methods
+//      - Test 3: Use keypad to display a binary number on LED bar, 8 times
+//      - Test 4: Flash LED bar, quantity based on keypad button, 4 times
 //
 //*****************************************************************************
 //*****************************************************************************
@@ -36,6 +41,7 @@ void run_lab6_part2(void);
 void run_lab6_part3(void);
 void run_lab6_part4(void);
 void debounce(void);
+void wait_for_PB1(void);
 void wait_for_PB2(void);
 
 //-----------------------------------------------------------------------------
@@ -110,19 +116,18 @@ void run_lab6_part2(void)
     
     lcd_set_ddram_addr(3);       //center?
     lcd_write_quadbyte(num32);      //Need to center
-    wait_for_PB2();
+    wait_for_PB1();
     debounce();
-    lcd_clear();
     
-    lcd_set_ddram_addr(5);       //center?
+    lcd_set_ddram_addr(LCD_LINE2_ADDR + 5);       //center?
     lcd_write_doublebyte(num16);    //Need to center
-    wait_for_PB2();
+    wait_for_PB1();
     debounce();
     lcd_clear();
     
     lcd_set_ddram_addr(6);       //center?
     lcd_write_byte(num8);           //Need to center
-    wait_for_PB2();
+    wait_for_PB1();
     debounce();
     lcd_clear();
     
@@ -143,49 +148,45 @@ void run_lab6_part3(void)
     lcd_write_string("Press PB2");
 
     wait_for_PB2();
-    //msec_delay(500);                //Make a wait-buton-press thing to replace this
     lcd_clear();
     lcd_write_string("Running Part 3");
     msec_delay(1000);
     lcd_clear();
     
     while (!done) {            
-            //PB1 is pressed -> reset the timer
-            if (is_pb_down(PB1_IDX)) {
-                timer_count = 100;  // Reset the timer to 100
-                debounce();  // Debounce PB1
-                while (is_pb_down(PB1_IDX)) {
-                    debounce();  // Wait until PB1 is released
-                }
+        //PB1 is pressed -> reset the timer
+        if (is_pb_down(PB1_IDX)) {
+            timer_count = 100;  // Reset the timer to 100
+            debounce();  // Debounce PB1
+            while (is_pb_down(PB1_IDX)) {
+                debounce();  // Wait until PB1 is released
             }
+        }
 
-            lcd_set_ddram_addr(6);       //center?
-            lcd_write_byte(timer_count);
-            msec_delay(200);
-            lcd_clear();
+        lcd_set_ddram_addr(6);       //center?
+        lcd_write_byte(timer_count);
+        msec_delay(200);
+        lcd_clear();
 
-            if (timer_count > 0) 
-            {
-                timer_count--;
-            } 
-            else 
-            {
-                timer_count = 100;
+        if (timer_count > 0) 
+        {
+            timer_count--;
+        } 
+        else 
+        {
+            timer_count = 100;
+        }
+
+        //PB2 is pressed -> stop the countdown
+        if (is_pb_down(PB2_IDX)) {
+            done = true;  // Stop the loop
+            debounce();  // Debounce PB2
+            while (is_pb_down(PB2_IDX)) {
+                debounce();  // Wait until PB2 is released
             }
-
-            //PB2 is pressed -> stop the countdown
-            if (is_pb_down(PB2_IDX)) {
-                done = true;  // Stop the loop
-                debounce();  // Debounce PB2
-                while (is_pb_down(PB2_IDX)) {
-                    debounce();  // Wait until PB2 is released
-                }
-            }
-
-        //}
+        }
     }
 
-    // When the loop ends, display "Part 3 Done" and turn off LEDs and segments
     lcd_clear();
     lcd_write_string("Part 3 Done");
     msec_delay(500);
@@ -199,13 +200,12 @@ void run_lab6_part4(void)
 
     bool done = false;
     uint8_t key;
-    uint8_t row = 0;    // Track the row position (0 or 1)
-    uint8_t col = 0;    // Track the column position (0 to 15)
+    uint8_t row = 0;
+    uint8_t col = 0;
     
-    lcd_set_ddram_addr(LCD_LINE2_ADDR);  // Set cursor to the second line
+    lcd_set_ddram_addr(LCD_LINE2_ADDR);
     lcd_write_string("Press PB2");
     wait_for_PB2();
-    //msec_delay(500);                //Make a wait-buton-press thing to replace this
     lcd_clear();
     lcd_write_string("Running Part 4");
     msec_delay(1000);
@@ -214,17 +214,23 @@ void run_lab6_part4(void)
     while (!done) {
         key = keypad_scan();
         
-        if (row >= 2) {
-            lcd_clear();
-            row = 0;
-            col = 0;
-        }
+        
 
-        if (key != 0x10) {  // Ignore if no key is pressed (key = 0x10 means no key)            
-            //lcd_write_byte(key);  // Write the key OLD
-            //col++; //Needs to be 5 not 16 if using bytes
+        if (key != 0x10) {  //Ignore if no key is pressed (key = 0x10 means no key)            
+            if (row >= 2) 
+            {
+                lcd_clear();
+                row = 0;
+                col = 0;
+            }
 
-            //Printing Keypress
+            hex_to_lcd(key);  // Write the key OLD
+            col++; //Needs to be 5 not 16 if using bytes
+
+            /*
+            //OLD - TURN INTO METHOD AND COMMENT IT OUT
+            //Printing Keypress - NEED TO CHANGE OUT FOR hex_to_lcd(); STUFF - Problem is the col counter - 
+            //DO NOT NEED DOUBLE DIGIT NUMBERS - SHOULD PRINT A, B, C, ETC.
             switch (key) {
                 case 0:
                     lcd_write_char('0');
@@ -317,6 +323,16 @@ void run_lab6_part4(void)
                 case 13:
                     lcd_write_char('1');
                     col++;
+                    if (col >= 16) {
+                        col = 0;
+                        row++; 
+                        lcd_set_ddram_addr(LCD_LINE2_ADDR);
+                    }
+                    if (row >= 2) {
+                        lcd_clear();
+                        row = 0;
+                        col = 0;
+                    }
                     lcd_write_char('3');
                     col++;
                     break;
@@ -353,6 +369,7 @@ void run_lab6_part4(void)
                     col++;
                     break;
             }
+            */
 
             wait_no_key_pressed();
         }
@@ -364,7 +381,7 @@ void run_lab6_part4(void)
         }
         
     
-        // If PB1 is pressed, clear the LCD and reset positions
+        //If PB1 is pressed, clear the LCD and reset positions
         if (is_pb_down(PB1_IDX)) {
             lcd_clear();
             row = 0;
@@ -372,7 +389,7 @@ void run_lab6_part4(void)
             debounce();  // Debounce PB1
         }
 
-        // If PB2 is pressed, exit the loop and display "Program Stopped"
+        //If PB2 is pressed, exit the loop and display "Program Stopped"
         if (is_pb_down(PB2_IDX)) {
             done = true;
             lcd_clear();
@@ -382,14 +399,10 @@ void run_lab6_part4(void)
 
         debounce();
     }
-
-    // Disable all LEDs and seven-segment displays
-    leds_off();
-    seg7_off();
 }
 
 //-----------------------------------------------------------------------------
-// Debounce: 10ms delay to prevent key bouncing
+// tbd
 //-----------------------------------------------------------------------------
 void wait_for_PB2() {
     while (is_pb_up(PB2_IDX))
@@ -400,6 +413,20 @@ void wait_for_PB2() {
         debounce();
     }
 }
+
+//-----------------------------------------------------------------------------
+// tbd
+//-----------------------------------------------------------------------------
+void wait_for_PB1() {
+    while (is_pb_up(PB1_IDX))
+    { 
+        debounce(); 
+    } 
+    while (is_pb_down(PB1_IDX)) {
+        debounce();
+    }
+}
+
 
 //-----------------------------------------------------------------------------
 // Debounce: 10ms delay to prevent key bouncing
