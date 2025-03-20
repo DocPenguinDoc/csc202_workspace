@@ -13,9 +13,9 @@
 //    This program serves as a tester for the LCD screen
 //    There are 4 tests:
 //      - Test 1: Display the alphabet, demonstrating text-wrapping
-//      - Test 2: Display numbers, demonstrating positioning & methods
-//      - Test 3: Use keypad to display a binary number on LED bar, 8 times
-//      - Test 4: Flash LED bar, quantity based on keypad button, 4 times
+//      - Test 2: Display numbers, demonstrating positioning & functions
+//      - Test 3: Display countdown. Manipulate with PB1 and PB2
+//      - Test 4: Display user inputs from keypad. Manipulate with PB1 and PB2
 //
 //*****************************************************************************
 //*****************************************************************************
@@ -85,7 +85,7 @@ int main(void)
 } /* main */
 
 //-----------------------------------------------------------------------------
-// PART 1:
+// PART 1: Display the alphabet, demonstrating text-wrapping
 //-----------------------------------------------------------------------------
 void run_lab6_part1(void)
 {
@@ -93,6 +93,7 @@ void run_lab6_part1(void)
     for (letter = 'A'; letter <= 'Z'; letter++) {
         lcd_write_char(letter);
         msec_delay(50);
+        //Spill to line 2 when line 1 fills
         if (letter == ('A' + CHARACTERS_PER_LCD_LINE - 1)) {
 		    lcd_set_ddram_addr(LCD_LINE2_ADDR);
         }
@@ -100,7 +101,7 @@ void run_lab6_part1(void)
 }
 
 //-----------------------------------------------------------------------------
-// PART 2:
+// PART 2: Display numbers, demonstrating positioning & functions
 //-----------------------------------------------------------------------------
 void run_lab6_part2(void)
 {
@@ -108,66 +109,74 @@ void run_lab6_part2(void)
     uint16_t num16 = 1234;
     uint8_t num8 = 123;
     
+    //Start Part 2
     wait_for_PB2();
     lcd_clear();
     lcd_write_string("Running Part 2");
     msec_delay(1000);
     lcd_clear();
     
-    lcd_set_ddram_addr(3);       //center?
-    lcd_write_quadbyte(num32);      //Need to center
-    wait_for_PB1();
+    //Disaply 32-bit value
+    lcd_set_ddram_addr(3);                      //Line 1 Center
+    lcd_write_quadbyte(num32);                  //Print 32-bit
+    wait_for_PB1();                             //Wait for user
     debounce();
     
-    lcd_set_ddram_addr(LCD_LINE2_ADDR + 5);       //center?
-    lcd_write_doublebyte(num16);    //Need to center
-    wait_for_PB1();
+    //Display 16-bit value
+    lcd_set_ddram_addr(LCD_LINE2_ADDR + 5);     //Line 2 Center
+    lcd_write_doublebyte(num16);                //Print 16-bit
+    wait_for_PB1();                             //Wait for user
     debounce();
-    lcd_clear();
+    lcd_clear();                                //Clear
     
-    lcd_set_ddram_addr(6);       //center?
-    lcd_write_byte(num8);           //Need to center
-    wait_for_PB1();
-    debounce();
-    lcd_clear();
+    //Display 8-bit value
+    lcd_set_ddram_addr(6);                      //Line 1 Center
+    lcd_write_byte(num8);                       //Print 8-bit
+    wait_for_PB1();                             //Wait for user
+    debounce();             
+    lcd_clear();                                //Clear
     
-    lcd_write_string("Part 2 Done");
+    //End Part 2
+    lcd_write_string("Part 2 Done");        
     msec_delay(500);
 }
 
 //-----------------------------------------------------------------------------
-// PART 3:
+// PART 3: Display countdown. Manipulate with PB1 and PB2
 //-----------------------------------------------------------------------------
 void run_lab6_part3(void)
 {
     uint8_t timer_count = 100;
-    bool done = false; 
-    uint8_t display_value = 0;
+    bool done = false;
 
+    //Start Part 3
     lcd_set_ddram_addr(LCD_LINE2_ADDR);
     lcd_write_string("Press PB2");
-
     wait_for_PB2();
     lcd_clear();
     lcd_write_string("Running Part 3");
     msec_delay(1000);
     lcd_clear();
     
+    //Continious Countdown (until user exits)
     while (!done) {            
         //PB1 is pressed -> reset the timer
         if (is_pb_down(PB1_IDX)) {
-            timer_count = 100;  // Reset the timer to 100
-            debounce();  // Debounce PB1
+            timer_count = 100;
+            debounce();
+            //Wait until PB1 is released
             while (is_pb_down(PB1_IDX)) {
-                debounce();  // Wait until PB1 is released
+                debounce();  
             }
         }
 
-        lcd_set_ddram_addr(6);       //center?
-        lcd_write_byte(timer_count);
-        msec_delay(200);
+        //Display Countdown
+        lcd_set_ddram_addr(6);                  //Line 1 center
+        lcd_write_byte(timer_count);            //Print timer count
+        msec_delay(200);                        //Decrement every .2 seconds
         lcd_clear();
 
+        //Decrement timer or loop timer when finished.
         if (timer_count > 0) 
         {
             timer_count--;
@@ -179,25 +188,26 @@ void run_lab6_part3(void)
 
         //PB2 is pressed -> stop the countdown
         if (is_pb_down(PB2_IDX)) {
-            done = true;  // Stop the loop
-            debounce();  // Debounce PB2
+            done = true;
+            debounce();
+            //Wait until PB2 is released
             while (is_pb_down(PB2_IDX)) {
-                debounce();  // Wait until PB2 is released
+                debounce();  
             }
         }
     }
 
+    //End Part 3
     lcd_clear();
     lcd_write_string("Part 3 Done");
     msec_delay(500);
 }
 
 //-----------------------------------------------------------------------------
-// PART 4:
+// PART 4: Display user inputs from keypad. Manipulate with PB1 and PB2
 //-----------------------------------------------------------------------------
 void run_lab6_part4(void)
 {
-
     bool done = false;
     uint8_t key;
     uint8_t row = 0;
@@ -212,189 +222,42 @@ void run_lab6_part4(void)
     lcd_clear();
 
     while (!done) {
-        key = keypad_scan();
-        
-        
-
-        if (key != 0x10) {  //Ignore if no key is pressed (key = 0x10 means no key)            
-            if (row >= 2) 
+        key = keypad_scan();                //Scan for keypress
+        if (key != 0x10) {                  //Only runs after key presses         
+            if (row >= 2)                   //Display full -> Clear
             {
                 lcd_clear();
                 row = 0;
                 col = 0;
             }
 
-            hex_to_lcd(key);  // Write the key OLD
-            col++; //Needs to be 5 not 16 if using bytes
+            hex_to_lcd(key);                //Print keypress
+            col++;                          //Increment character counter
 
-            /*
-            //OLD - TURN INTO METHOD AND COMMENT IT OUT
-            //Printing Keypress - NEED TO CHANGE OUT FOR hex_to_lcd(); STUFF - Problem is the col counter - 
-            //DO NOT NEED DOUBLE DIGIT NUMBERS - SHOULD PRINT A, B, C, ETC.
-            switch (key) {
-                case 0:
-                    lcd_write_char('0');
-                    col++;
-                    break;
-                case 1:
-                    lcd_write_char('1');
-                    col++;
-                    break;
-                case 2:
-                    lcd_write_char('2');
-                    col++;
-                    break;
-                case 3:
-                    lcd_write_char('3');
-                    col++;
-                    break;
-                case 4:
-                    lcd_write_char('4');
-                    col++;
-                    break;
-                case 5:
-                    lcd_write_char('5');
-                    col++;
-                    break;
-                case 6:
-                    lcd_write_char('6');
-                    col++;
-                    break;
-                case 7:
-                    lcd_write_char('7');
-                    col++;
-                    break;
-                case 8:
-                    lcd_write_char('8');
-                    col++;
-                    break;
-                case 9:
-                    lcd_write_char('9');
-                    col++;
-                    break;
-                case 10:
-                    lcd_write_char('1');
-                    col++;
-                    if (col >= 16) {
-                        col = 0;
-                        row++; 
-                        lcd_set_ddram_addr(LCD_LINE2_ADDR);
-                    }
-                    if (row >= 2) {
-                        lcd_clear();
-                        row = 0;
-                        col = 0;
-                    }
-                    lcd_write_char('0');
-                    col++;
-                    break;
-                case 11:
-                    lcd_write_char('1');
-                    col++;
-                    if (col >= 16) {
-                        col = 0;
-                        row++; 
-                        lcd_set_ddram_addr(LCD_LINE2_ADDR);
-                    }
-                    if (row >= 2) {
-                        lcd_clear();
-                        row = 0;
-                        col = 0;
-                    }
-                    lcd_write_char('1');
-                    col++;
-                    break;
-                case 12:
-                    lcd_write_char('1');
-                    col++;
-                    if (col >= 16) {
-                        col = 0;
-                        row++; 
-                        lcd_set_ddram_addr(LCD_LINE2_ADDR);
-                    }
-                    if (row >= 2) {
-                        lcd_clear();
-                        row = 0;
-                        col = 0;
-                    }
-                    lcd_write_char('2');
-                    col++;
-                    break;
-                case 13:
-                    lcd_write_char('1');
-                    col++;
-                    if (col >= 16) {
-                        col = 0;
-                        row++; 
-                        lcd_set_ddram_addr(LCD_LINE2_ADDR);
-                    }
-                    if (row >= 2) {
-                        lcd_clear();
-                        row = 0;
-                        col = 0;
-                    }
-                    lcd_write_char('3');
-                    col++;
-                    break;
-                case 14:
-                    lcd_write_char('1');
-                    col++;
-                    if (col >= 16) {
-                        col = 0;
-                        row++; 
-                        lcd_set_ddram_addr(LCD_LINE2_ADDR);
-                    }
-                    if (row >= 2) {
-                        lcd_clear();
-                        row = 0;
-                        col = 0;
-                    }
-                    lcd_write_char('4');
-                    col++;
-                    break;
-                case 15:
-                    lcd_write_char('1');
-                    col++;
-                    if (col >= 16) {
-                        col = 0;
-                        row++; 
-                        lcd_set_ddram_addr(LCD_LINE2_ADDR);
-                    }
-                    if (row >= 2) {
-                        lcd_clear();
-                        row = 0;
-                        col = 0;
-                    }
-                    lcd_write_char('5');
-                    col++;
-                    break;
-            }
-            */
-
-            wait_no_key_pressed();
+            wait_no_key_pressed();          //Wait until key is released
         }
 
+        //Row fills -> Next Row
         if (col >= 16) {
             col = 0;
             row++; 
             lcd_set_ddram_addr(LCD_LINE2_ADDR);
         }
-        
     
-        //If PB1 is pressed, clear the LCD and reset positions
+        //PB1 is pressed -> Clear & Reset Display
         if (is_pb_down(PB1_IDX)) {
             lcd_clear();
             row = 0;
             col = 0;
-            debounce();  // Debounce PB1
+            debounce();
         }
 
-        //If PB2 is pressed, exit the loop and display "Program Stopped"
+        //PB2 pressed -> Exit the loop and End Program
         if (is_pb_down(PB2_IDX)) {
             done = true;
             lcd_clear();
             lcd_write_string("Program Stopped");
-            debounce();  // Debounce PB2
+            debounce();
         }
 
         debounce();
@@ -402,26 +265,30 @@ void run_lab6_part4(void)
 }
 
 //-----------------------------------------------------------------------------
-// tbd
+// Hold for PB2: Basic function that waits for a user to push PB1
 //-----------------------------------------------------------------------------
 void wait_for_PB2() {
+    //Wait for input
     while (is_pb_up(PB2_IDX))
     { 
         debounce(); 
     } 
+    //Wait for user to release input
     while (is_pb_down(PB2_IDX)) {
         debounce();
     }
 }
 
 //-----------------------------------------------------------------------------
-// tbd
+// Hold for PB1: Basic function that waits for a user to push PB1
 //-----------------------------------------------------------------------------
 void wait_for_PB1() {
+    //Wait for input
     while (is_pb_up(PB1_IDX))
     { 
         debounce(); 
-    } 
+    }
+    //Wait for user to release input
     while (is_pb_down(PB1_IDX)) {
         debounce();
     }
