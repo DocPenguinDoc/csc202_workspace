@@ -1,16 +1,19 @@
 //*****************************************************************************
 //*****************************    C Source Code    ***************************
 //*****************************************************************************
-//  DESIGNER NAME:  TBD
+//  DESIGNER NAME:  Connor Blum
 //
-//       LAB NAME:  TBD
+//       LAB NAME:  Lab 7
 //
-//      FILE NAME:  main.c
+//      FILE NAME:  lab7p4_main.c
 //
 //-----------------------------------------------------------------------------
 //
 // DESCRIPTION:
-//    This program serves as a ... 
+//    This program serves as a demonstration of configuring GPIO interrupts.
+//    The main focus is a 0 to 99 counter on the LCD screen, with PB interrupts
+//      PB1 interrupt: Terminates program/countdown
+//      PB2 interrupt: Toggles message "PB2 PRESSED" on Line 2 of LCD
 //
 //*****************************************************************************
 //*****************************************************************************
@@ -56,6 +59,7 @@ bool pb2_pressed = false;
 
 int main(void)
 {
+    //Configure Launchpad Boards
     clock_init_40mhz();
     launchpad_gpio_init();
     led_init();
@@ -66,19 +70,21 @@ int main(void)
     lcd1602_init();
     lcd_clear();
     
+    //Configure PB interrupts
     config_pb2_interrupts();
     config_pb1_interrupts();
 
     // PART 4
     run_lab7_part4();
 
- // Endless loop to prevent program from ending
- // while (1);
+    // Endless loop to prevent program from ending
+    // while (1);
 
 } /* main */
 
 //-----------------------------------------------------------------------------
-// PART 4:
+// PART 4: Display countdown while using GPIO interrupts.
+//          PB1 terminates countdown. PB2 toggles message on line 2
 //-----------------------------------------------------------------------------
 void run_lab7_part4(void)
 {
@@ -86,6 +92,7 @@ void run_lab7_part4(void)
     bool done = false;
     bool bottom_text = false;
     
+    //Loop countdown until PB1 is pressed
     while (!pb1_pressed) 
     {      
         //Display Countdown
@@ -94,7 +101,7 @@ void run_lab7_part4(void)
         msec_delay(200);                        //Decrement every .2 seconds
         lcd_set_ddram_addr(LCD_LINE2_ADDR);
 
-        //Decrement timer or loop timer when finished.
+        //Increment timer or loop timer when finished.
         if (timer_count < 99) 
         {
             timer_count++;
@@ -104,30 +111,38 @@ void run_lab7_part4(void)
             timer_count = 0;
         }
 
+        //When PB2 is pressed, toggle a message on the second line of LCD
         while (pb2_pressed) 
         {  
             lcd_set_ddram_addr(LCD_LINE2_ADDR);
+
+            //Uses flag to toggle the message based on PB2 presses
             if (bottom_text)
             {
                 lcd_write_string("PB2 PRESSED");
-                bottom_text = !bottom_text;
             }
             else
             {
                 lcd_clear();
-                bottom_text = !bottom_text;
             }
+            bottom_text = !bottom_text;
             debounce();
+
+            //Reset PB2 flag
             pb2_pressed = false;
         }
     }
+
+    //When PB1 is pressed, display message conveying end of program.
     lcd_clear();
     lcd_write_string("Program Stopped");
 }
 
 
 
-//1
+//-----------------------------------------------------------------------------
+// Configures PB1 interrupt (GPIOB, DOI18)
+//-----------------------------------------------------------------------------
 void config_pb1_interrupts(void)
 {
     //Set SW1 to rising edge (after inversion)
@@ -141,29 +156,11 @@ void config_pb1_interrupts(void)
 
     NVIC_SetPriority(GPIOB_INT_IRQn, 2);
     NVIC_EnableIRQ(GPIOB_INT_IRQn);
-
-    //clear previously set flags within RIS (Raw Interrupt Status) register by writing to the ICLR (Interrupt Clear Register)
-        //How to write to ICLR
-    //Configure interrupt polarity for each port pin that will generate an interrupt by setting the appropriate bits in the POLARITYx (Polarity Select Register)
-        //Use POLARITY31_16 and POLARITY15_0 registers for edge detection
-    //Enable the interrupt for the desired port pins by setting the corresponding bits in the Interrupt Mask (IMASK) Register.
-    //Enable the interrupt using the NVIC_EnableIRQ(xxx) function. xxx is either GPIOA_INT_IRQn or GPIOB_INT_IRQn depending on the GPIO module you are working with
-        //ex:
-        //NVIC_EnableIRQ(GPIOA_INT_IRQn)
-        //NVIC_EnableIRQ(GPIOB_INT_IRQn)
-    //NVIC_EnableIRQ(GPIOB_INT_IRQn);
-
-    //Inside interrupt handler, read the IIDX for the grouping to determine source (GPIOA or GPIOB). Then read MIS (Masked Interrupt Status) register from the corresponding GPIO and check each bit you are interested in to see if it is set.
-        //Read CPUSS IIDX ex:
-        // group_gpio_iidx = CPUSS->INT_GROUP[1].IIDX;
-        //Check set bit ex:
-        //CPUSS_INT_GROUP_IIDX_STAT_INT0
-        //CPUSS_INT_GROUP_IIDX_STAT_INT1
-    //If bit is set, it indicates that the button was pressed, and you should set a global flag indicating the button was pressed.
-    //Cannot use is_pb_down etc. in the ISR
 }
 
-//2
+//-----------------------------------------------------------------------------
+// Configures PB2 interrupt (GPIOA, DOI15)
+//-----------------------------------------------------------------------------
 void config_pb2_interrupts(void)
 {
     //Set SW1 to rising edge (after inversion)
@@ -179,6 +176,9 @@ void config_pb2_interrupts(void)
     NVIC_EnableIRQ(GPIOA_INT_IRQn);
 }
 
+//-----------------------------------------------------------------------------
+// GROUP1 Interrupt Handler (handles interrupts from GPIOA and GPIOB)
+//-----------------------------------------------------------------------------
 void GROUP1_IRQHandler(void)
 {
     uint32_t group_iidx_status;

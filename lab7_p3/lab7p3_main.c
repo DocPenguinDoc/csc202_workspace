@@ -1,16 +1,18 @@
 //*****************************************************************************
 //*****************************    C Source Code    ***************************
 //*****************************************************************************
-//  DESIGNER NAME:  TBD
+//  DESIGNER NAME:  Connor Blum
 //
-//       LAB NAME:  TBD
+//       LAB NAME:  Lab 7
 //
-//      FILE NAME:  main.c
+//      FILE NAME:  lab7p3_main.c
 //
 //-----------------------------------------------------------------------------
 //
 // DESCRIPTION:
-//    This program serves as a ... 
+//    This program serves as a demonstration of SysTick timer to manage an
+//    operation (displaying count of active DIP switches on Seg7 display)
+//    while the main focus is on a count of 0 to 99 on the LCD screen
 //
 //*****************************************************************************
 //*****************************************************************************
@@ -37,21 +39,21 @@ void run_lab7_part3(void);
 // Define symbolic constants used by the program
 //-----------------------------------------------------------------------------
 
-#define MSPM0_CLOCK_FREQUENCY        (40E6)
-#define SYST_TICK_PERIOD             (10.25E-3)
+#define MSPM0_CLOCK_FREQUENCY                                            (40E6)
+#define SYST_TICK_PERIOD                                             (10.25E-3)
 #define SYST_TICK_PERIOD_COUNT       (SYST_TICK_PERIOD * MSPM0_CLOCK_FREQUENCY)
 
 //-----------------------------------------------------------------------------
 // Define global variables and structures here.
 // NOTE: when possible avoid using global variables
 //-----------------------------------------------------------------------------
-#define NUM_STATES                      18
 const uint8_t delay_count = 0x0C;
 
 // Define a structure to hold different data types
 
 int main(void)
 {
+    //Configure Launchpad Boards
     clock_init_40mhz();
     launchpad_gpio_init();
     led_init();
@@ -66,13 +68,13 @@ int main(void)
     // PART 3
     run_lab7_part3();
 
- // Endless loop to prevent program from ending
- // while (1);
+    // Endless loop to prevent program from ending
+    // while (1);
 
 } /* main */
 
 //-----------------------------------------------------------------------------
-// PART 3:
+// PART 3: Display a 0->99 counter.
 //-----------------------------------------------------------------------------
 void run_lab7_part3(void)
 {
@@ -103,8 +105,10 @@ void run_lab7_part3(void)
 //-----------------------------------------------------------------------------
 // DESCRIPTION:
 //   This function represents the ISR (Interrupt Service Routine) for
-//   the SysTick timer. It is called at regulare intervals based on the
-//   configured SysTick period. This ISR is responsible for managing...
+//   the SysTick timer. It is called at regular intervals based on the
+//   configured SysTick period. This ISR is responsible for montiroing
+//   the DIP switches, and counting the number of switches that are on.
+//   The result is displayed on the seven-segment display.
 //
 // INPUT PARAMETERS:
 //   none
@@ -118,7 +122,6 @@ void run_lab7_part3(void)
 void SysTick_Handler(void)
 {
     static uint16_t delay_time = 1;
-    static uint16_t code_index = 0;
 
     delay_time--;
     if (delay_time == 0)
@@ -171,18 +174,12 @@ void SysTick_Handler(void)
             case 15: 
                 seg7_hex(0x4, SEG7_DIG0_ENABLE_IDX);
                 break;
+            //Unexpected State Error
             default: 
                 seg7_hex(0xE, SEG7_DIG0_ENABLE_IDX);
         }
         
-
         // get next delay time
         delay_time = delay_count;
-        code_index++;
-
-        if (code_index == NUM_STATES)
-        {
-            code_index = 0;
-        } /* if */
     } /* if */
 } /* SysTick_Handler */
