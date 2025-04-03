@@ -1,16 +1,31 @@
 //*****************************************************************************
 //*****************************    C Source Code    ***************************
 //*****************************************************************************
-//  DESIGNER NAME:  TBD
+//  DESIGNER NAME:  Connor Blum
 //
-//       LAB NAME:  TBD
+//       LAB NAME:  Lab 9
 //
-//      FILE NAME:  main.c
+//      FILE NAME:  lab9p3_main.c
 //
 //-----------------------------------------------------------------------------
 //
 // DESCRIPTION:
-//    This program serves as a ... 
+//    This program serves as a tester for the servomotor, the position of which
+//    is determined by an ADC value retrieved from the potentiometer, which is
+//    converted to 10 bits, then converted to the necessary count value to
+//    manipulate the servomotor.
+//    Interrupts are used to end the program, and change the motor direction
+//
+//-----------------------------------------------------------------------------
+//
+// HARDWARE REQUIREMENTS:
+//    - MSPM0G3507 Microcontroller
+//    - CSC202 Expansion Board
+//    - Pushbutton 1
+//    - LCD1602 module
+//    - Potentiometer
+//    - L293D motor driver IC
+//    - Servomotor
 //
 //*****************************************************************************
 //*****************************************************************************
@@ -43,10 +58,10 @@ void debounce(void);
 // Define symbolic constants used by the program
 //-----------------------------------------------------------------------------
 #define DEGREES                  0xDF    //Value for degree symbol on LCD
-#define MAX_ADC_VALUE            1023    //
-#define MIN_SERVO_COUNT          100     //
-#define MAX_SERVO_COUNT          500     //
-#define ADC_THRESHOLD            0.25    //
+#define MAX_ADC_VALUE            1023    //Maximum 10-bit ADC value
+#define MIN_SERVO_COUNT          100     //Minimum count for Servo
+#define MAX_SERVO_COUNT          500     //Maximum count for Servo
+#define POTENTIOMETER            7       //Potentiometer Channel (7)
 
 //-----------------------------------------------------------------------------
 // Define global variables and structures here.
@@ -60,10 +75,6 @@ bool pb2_pressed = false;
 
 int main(void)
 {
-    uint16_t adc_pot_value = 0;
-    uint8_t switch_value = 0;
-    uint8_t duty_cycle = 0;
-
     //Configure Launchpad Boards
     clock_init_40mhz();
     launchpad_gpio_init();
@@ -73,10 +84,12 @@ int main(void)
     I2C_init();
     lcd1602_init();
     lcd_clear();
-    keypad_init();
-
+    
     ADC0_init(ADC12_MEMCTL_VRSEL_INTREF_VSSA);
 
+    //Configure motor
+    led_on(LED_BAR_LD1_IDX);
+    led_off(LED_BAR_LD2_IDX);
     motor0_init();
     motor0_pwm_init(4000,0);
     motor0_pwm_enable();
@@ -85,49 +98,65 @@ int main(void)
     config_pb2_interrupts();
     config_pb1_interrupts();
 
-
+    // PART 3
     run_lab9_part3();
- 
- // Endless loop to prevent program from ending
- //while (1);
 
+    //Disable peripherals
+    leds_off();
+    motor0_pwm_disable();
+    NVIC_DisableIRQ(GPIOB_INT_IRQn);
+    NVIC_DisableIRQ(GPIOA_INT_IRQn);
+
+    // Endless loop to prevent program from ending
+    //while (1);
 } /* main */
 
 //-----------------------------------------------------------------------------
-// PART 3: 
-//-----------------------------------------------------------------------------
+// DESCRIPTION:
+//    This function reads and displays the ADC value from the potentiometer,
+//    converted to 10 bits (from 12), on the LCD screen.
+//    This reading is converted to a count value which is used to manipulate
+//    the servo, and is also displayed on the LCD screen.
+//    The interrupt PB1, will end the program.
+//
+// INPUT PARAMETERS:
+//    none
+//
+// OUTPUT PARAMETERS:
+//    none
+//
+// RETURN:
+//    none
+//------------------------------------------------------------------------------
 void run_lab9_part3(void)
 {
     uint16_t adc_value = 0;
     uint16_t servo_count = 0;
 
     lcd_write_string("Running Part 3");
-    msec_delay(1000);  // Short delay to display the message
+    msec_delay(1000);
     lcd_clear();
 
     while (!pb1_pressed) {
-        //Read potentiometer
-        adc_value = ADC0_in(7);
+        //Read potentiometer, Calculate Servo Count
+        adc_value = ADC0_in(POTENTIOMETER);
+        adc_value >>= 2;
+        servo_count =   adc_value * (MAX_SERVO_COUNT - MIN_SERVO_COUNT) 
+                        / MAX_ADC_VALUE + MIN_SERVO_COUNT;
         
-        //Map ADC value (0-1023) to servo pulse width (100-500)
-        servo_count = (adc_value * (MAX_SERVO_COUNT - MIN_SERVO_COUNT)) / MAX_ADC_VALUE + MIN_SERVO_COUNT;
-
-        // Display ADC value on LCD (line 1)
+        //Display ADC value
         lcd_set_ddram_addr(LCD_LINE1_ADDR);
         lcd_write_string("ADC VAL = ");
         lcd_write_doublebyte(adc_value);
 
-        // Display servo count on LCD (line 2)
+        //Display servo count
         lcd_set_ddram_addr(LCD_LINE2_ADDR);
         lcd_write_string("SERVO # = ");
         lcd_write_doublebyte(servo_count);
 
-        // Generate PWM signal for servo motor using servo count
-        // Timer configuration (we assume timer setup is done already)
-        // Assuming a timer running at 200 kHz, 100 counts = 0.5ms pulse width
-        motor0_set_pwm_count(servo_count);  // This function sets the PWM based on the calculated servo count
+        motor0_set_pwm_count(servo_count);
 
-        // Wait for 0.25 seconds (ADC stabilization delay)
+        //Wait 0.25 seconds
         msec_delay(250);
     }
 
@@ -135,7 +164,7 @@ void run_lab9_part3(void)
     lcd_clear();
     lcd_set_ddram_addr(LCD_LINE1_ADDR);
     lcd_write_string("Program Stopped");
-}
+} /* run_lab9_part3 */
 
 //-----------------------------------------------------------------------------
 // DESCRIPTION:
@@ -163,7 +192,7 @@ void config_pb1_interrupts(void)
 
     NVIC_SetPriority(GPIOB_INT_IRQn, 2);
     NVIC_EnableIRQ(GPIOB_INT_IRQn);
-}
+} /* config_pb1_interrupts */
 
 //-----------------------------------------------------------------------------
 // DESCRIPTION:
@@ -191,7 +220,7 @@ void config_pb2_interrupts(void)
 
     NVIC_SetPriority(GPIOA_INT_IRQn, 2);
     NVIC_EnableIRQ(GPIOA_INT_IRQn);
-}
+} /* config_pb2_interrupts */
 
 //-----------------------------------------------------------------------------
 // DESCRIPTION:
@@ -245,7 +274,7 @@ void GROUP1_IRQHandler(void)
                 break;
         }
     } while (group_iidx_status != 0);
-}
+} /* GROUP1_IRQHandler */
 
 //-----------------------------------------------------------------------------
 // DESCRIPTION:
@@ -263,4 +292,4 @@ void GROUP1_IRQHandler(void)
 // -----------------------------------------------------------------------------
 void debounce() {
     msec_delay(10);
-}
+} /* debounce */

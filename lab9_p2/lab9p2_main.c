@@ -1,16 +1,29 @@
 //*****************************************************************************
 //*****************************    C Source Code    ***************************
 //*****************************************************************************
-//  DESIGNER NAME:  TBD
+//  DESIGNER NAME:  Connor Blum
 //
-//       LAB NAME:  TBD
+//       LAB NAME:  Lab 9
 //
-//      FILE NAME:  main.c
+//      FILE NAME:  lab9p2_main.c
 //
 //-----------------------------------------------------------------------------
 //
 // DESCRIPTION:
-//    This program serves as a ... 
+//    This program serves as a simulation of a computer fan, testing the DC
+//    motor. This is accomplished by reading an ADC value from the thermistor,
+//    and using a defined threshold to determine the "fan speed".
+//    An interrupt is used to end the program.
+//
+//-----------------------------------------------------------------------------
+//
+// HARDWARE REQUIREMENTS:
+//    - MSPM0G3507 Microcontroller
+//    - CSC202 Expansion Board
+//    - Pushbuttons 1 & 2
+//    - LCD1602 module
+//    - L293D motor driver IC
+//    - DC Motor
 //
 //*****************************************************************************
 //*****************************************************************************
@@ -43,6 +56,8 @@ void debounce(void);
 // Define symbolic constants used by the program
 //-----------------------------------------------------------------------------
 #define DEGREES                  0xDF    //Value for degree symbol on LCD
+#define THERMISTOR               5       //Light Sensor Channel (7)
+#define TEMP_THRESHOLD           80      //Temperature threshold
 
 //-----------------------------------------------------------------------------
 // Define global variables and structures here.
@@ -69,52 +84,78 @@ int main(void)
     I2C_init();
     lcd1602_init();
     lcd_clear();
-    keypad_init();
-
+    
     ADC0_init(ADC12_MEMCTL_VRSEL_INTREF_VSSA);
 
+    //Configure motor
+    led_on(LED_BAR_LD1_IDX);
+    led_off(LED_BAR_LD2_IDX);
     motor0_init();
     motor0_pwm_init(4000,0);
     motor0_pwm_enable();
+    
 
     //Configure PB interrupts
     config_pb2_interrupts();
     config_pb1_interrupts();
 
-
+    // PART 2
     run_lab9_part2();
- 
- // Endless loop to prevent program from ending
- //while (1);
 
+    //Disable peripherals
+    leds_off();
+    motor0_pwm_disable();
+    NVIC_DisableIRQ(GPIOB_INT_IRQn);
+    NVIC_DisableIRQ(GPIOA_INT_IRQn);
+
+    // Endless loop to prevent program from ending
+    //while (1);
 } /* main */
 
 //-----------------------------------------------------------------------------
-// PART 2: 
-//-----------------------------------------------------------------------------
+// DESCRIPTION:
+//    This function reads an ADC value from the thermistor, and converts it to
+//    Fahrenheit, before displaying it on the LCD.
+//    Depending on whether the current temperature is above/below a certain
+//    threshold, the "fan speed" is changed
+//    The interrupt PB1, will end the program.
+//
+// INPUT PARAMETERS:
+//    none
+//
+// OUTPUT PARAMETERS:
+//    none
+//
+// RETURN:
+//    none
+//------------------------------------------------------------------------------
 void run_lab9_part2(void)
 {
     uint8_t speed;
     int therm_adc_value;
     
+    //Part 2 Begins
     lcd_write_string("Running Part 2");
     msec_delay(1000);
     lcd_clear();
 
     while (!pb1_pressed) {
-        therm_adc_value = ADC0_in(5);
-        // Calculate and display thermistor reading in Fahrenheit
+        //Read thermistor, and convert reading to Fahrenheit
+        therm_adc_value = ADC0_in(THERMISTOR);
         float temp_Celsius = thermistor_calc_temperature(therm_adc_value);
         float temp_Fahrenheit = (temp_Celsius * 9 / 5) + 32;
+
+        //Display temperature on LCD
         lcd_set_ddram_addr(LCD_LINE1_ADDR + 1);
         lcd_write_string("TEMP = ");
         lcd_write_byte(temp_Fahrenheit);
         lcd_write_char(DEGREES);               
         lcd_write_string("F");
 
+        //Determine, set,5 and display "fan speed"
         lcd_set_ddram_addr(LCD_LINE2_ADDR);
         lcd_write_string("SPEED = ");
-        if (temp_Fahrenheit > 80)
+        if (temp_Fahrenheit > TEMP_THRESHOLD)
         {
             speed = 80;
         }
@@ -126,13 +167,14 @@ void run_lab9_part2(void)
         lcd_write_byte(speed);
         lcd_write_string("%");        
         
+        //.25 second loop iteration delay
         msec_delay(250);
     }
 
     //Display "Program Stopped" when PB1 is pressed
     lcd_clear();
     lcd_write_string("Program Stopped");
-}
+} /* run_lab9_part2 */
 
 //-----------------------------------------------------------------------------
 // DESCRIPTION:
@@ -160,7 +202,7 @@ void config_pb1_interrupts(void)
 
     NVIC_SetPriority(GPIOB_INT_IRQn, 2);
     NVIC_EnableIRQ(GPIOB_INT_IRQn);
-}
+} /* config_pb1_interrupts */
 
 //-----------------------------------------------------------------------------
 // DESCRIPTION:
@@ -188,7 +230,7 @@ void config_pb2_interrupts(void)
 
     NVIC_SetPriority(GPIOA_INT_IRQn, 2);
     NVIC_EnableIRQ(GPIOA_INT_IRQn);
-}
+} /* config_pb2_interrupts */
 
 //-----------------------------------------------------------------------------
 // DESCRIPTION:
@@ -242,7 +284,7 @@ void GROUP1_IRQHandler(void)
                 break;
         }
     } while (group_iidx_status != 0);
-}
+} /* GROUP1_IRQHandler */
 
 //-----------------------------------------------------------------------------
 // DESCRIPTION:
@@ -260,4 +302,4 @@ void GROUP1_IRQHandler(void)
 // -----------------------------------------------------------------------------
 void debounce() {
     msec_delay(10);
-}
+} /* debounce */

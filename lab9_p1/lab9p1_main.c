@@ -1,16 +1,30 @@
 //*****************************************************************************
 //*****************************    C Source Code    ***************************
 //*****************************************************************************
-//  DESIGNER NAME:  TBD
+//  DESIGNER NAME:  Connor Blum
 //
-//       LAB NAME:  TBD
+//       LAB NAME:  Lab 9
 //
-//      FILE NAME:  main.c
+//      FILE NAME:  lab9p1_main.c
 //
 //-----------------------------------------------------------------------------
 //
 // DESCRIPTION:
-//    This program serves as a ... 
+//    This program serves as a tester for the DC motor, using the keypad to
+//    create a 0-100% speed based on the available 0-15 input.
+//    The LCD screen is used to display the motor speed.
+//    Interrupts are used to end the program, and change the motor direction
+//
+//-----------------------------------------------------------------------------
+//
+// HARDWARE REQUIREMENTS:
+//    - MSPM0G3507 Microcontroller
+//    - CSC202 Expansion Board
+//    - Pushbuttons 1 & 2
+//    - Keypad
+//    - LCD1602 module
+//    - L293D motor driver IC
+//    - DC Motor
 //
 //*****************************************************************************
 //*****************************************************************************
@@ -42,11 +56,11 @@ void debounce(void);
 //-----------------------------------------------------------------------------
 // Define symbolic constants used by the program
 //-----------------------------------------------------------------------------
-typedef enum {
-    MOTOR_OFF1,
-    MOTOR_CW,
-    MOTOR_OFF2,
-    MOTOR_CCW
+typedef enum {                          //Defined motor states
+    MOTOR_OFF1,                         //Motor Off
+    MOTOR_CW,                           //Motor Clockwise
+    MOTOR_OFF2,                         //Motor Off
+    MOTOR_CCW                           //Motor Counterclockwise
 } motor_state_t;
 
 //-----------------------------------------------------------------------------
@@ -55,8 +69,6 @@ typedef enum {
 //-----------------------------------------------------------------------------
 bool pb1_pressed = false;
 bool pb2_pressed = false;
-static motor_state_t motor_state = MOTOR_OFF1;
-
 
 // Define a structure to hold different data types
 
@@ -75,6 +87,9 @@ int main(void)
 
     ADC0_init(ADC12_MEMCTL_VRSEL_INTREF_VSSA);
 
+    //Configure motor
+    led_on(LED_BAR_LD1_IDX);
+    led_off(LED_BAR_LD2_IDX);
     motor0_init();
     motor0_pwm_init(4000,0);
     motor0_pwm_enable();
@@ -83,129 +98,117 @@ int main(void)
     config_pb2_interrupts();
     config_pb1_interrupts();
 
-
-    /* Slides Example
-    uint16_t adc_pot_value = 0;
-    uint8_t switch_value = 0;
-    uint8_t duty_cycle = 0;
-
-    motor0_init();
-    motor0_pwm_init(4000,0);
-    motor0_pwm_enable();
-
-    
-    while (1)
-    {
-        switch_value = dipsw_read();
-        //adc_pot_value = ADC0_in(7);
-        //adc_pot_value >>= 2;
-        //duty_cycle = (adc_pot_value * 100) / 1024;
-        duty_cycle = 50;
-        motor0_set_pwm_dc(duty_cycle);
-        lcd_set_ddram_addr(LCD_LINE1_ADDR);
-        lcd_write_byte(duty_cycle);
-
-        if ((switch_value & 0x3) == 0x1)
-        {
-            led_on(LED_BAR_LD1_IDX);
-            led_off(LED_BAR_LD2_IDX);
-        }
-        else if ((switch_value & 0x3) == 0x2)
-        {
-            led_off(LED_BAR_LD1_IDX);
-            led_on(LED_BAR_LD2_IDX);
-        }
-        else
-        {
-            led_off(LED_BAR_LD1_IDX);
-            led_off(LED_BAR_LD2_IDX);
-        }
-    }
-    //*/
-
+    // PART 1
     run_lab9_part1();
- 
+
+    //Disable peripherals
+    leds_off();
+    motor0_pwm_disable();
+    NVIC_DisableIRQ(GPIOB_INT_IRQn);
+    NVIC_DisableIRQ(GPIOA_INT_IRQn);
+    
  // Endless loop to prevent program from ending
  //while (1);
-
 } /* main */
 
 //-----------------------------------------------------------------------------
-// PART 1: 
-//-----------------------------------------------------------------------------
+// DESCRIPTION:
+//    This function reads a value from the keypad (0-15) and converts it to a
+//    percentage (0-100), and displays it to the screen.
+//    This percentage represents the motor speed, which is based on the keypad
+//    input.
+//    The interrupt PB1, will change the state of the motor, looping through
+//    the following states: Off, Clockwise, Off, Counterclockwise
+//    The interrupt PB1, will end the program.
+//
+// INPUT PARAMETERS:
+//    none
+//
+// OUTPUT PARAMETERS:
+//    none
+//
+// RETURN:
+//    none
+//------------------------------------------------------------------------------
 void run_lab9_part1(void)
 {
-    bool done = false;
     uint8_t key;
-    uint8_t speed;
+    uint8_t duty_cycle;
+
+    //Set initial motor state
     static motor_state_t motor_state = MOTOR_OFF1;
-    
+    led_off(LED_BAR_LD1_IDX);
+    led_off(LED_BAR_LD2_IDX);
+
+    //Part 1 Begins
     lcd_write_string("Running Part 1");
     msec_delay(1000);
     lcd_clear();
 
     while (!pb1_pressed) {
+        //Display Heading
         lcd_set_ddram_addr(LCD_LINE1_ADDR + 2);
         lcd_write_string("MOTOR SPEED");
-        key = keypad_scan();                //Scan for keypress
-        if (key != 0x10) {                  //Only runs after key presses         
-            speed = key * 100 / 15;
+
+        //Calculate & Display Duty Cycle
+        key = keypad_scan();
+        if (key != 0x10) {         
+            duty_cycle = key * 100 / 15;
+            motor0_set_pwm_dc(duty_cycle);
             lcd_set_ddram_addr(LCD_LINE2_ADDR + 5);
-            lcd_write_byte(speed);          //Print speed
+            lcd_write_byte(duty_cycle);
             lcd_write_string("%");
-            motor0_set_pwm_dc(speed);
-            wait_no_key_pressed();          //Wait until key is released
+            wait_no_key_pressed();
         }
 
+        //Advance motor state when interrupt PB2 is pressed
         while (pb2_pressed) 
         {  
             switch (motor_state) {
+                //Transition to clockwise state
                 case MOTOR_OFF1:
-                    //motor0_pwm_disable();  // Turn off PWM to stop motor
-                    led_off(LED_BAR_LD1_IDX);
-                    led_off(LED_BAR_LD2_IDX);
-                    motor_state = MOTOR_CW;  // Transition to clockwise state
-                    break;
-
-                case MOTOR_CW:
-                    //motor0_pwm_enable();  // Enable PWM
                     led_on(LED_BAR_LD1_IDX);
                     led_off(LED_BAR_LD2_IDX);
-                    motor_state = MOTOR_OFF2;  // Transition to off state
+                    motor_state = MOTOR_CW;     
                     break;
 
-                case MOTOR_OFF2:
-                    //motor0_pwm_disable();  // Turn off PWM to stop motor
+                //Transition to off state
+                case MOTOR_CW:
                     led_off(LED_BAR_LD1_IDX);
                     led_off(LED_BAR_LD2_IDX);
-                    motor_state = MOTOR_CCW;  // Transition to counterclockwise state
+                    motor_state = MOTOR_OFF2;   
                     break;
 
-                case MOTOR_CCW:
-                    // Motor runs counterclockwise
-                    //motor0_pwm_enable();  // Enable PWM
+                //Transition to counterclockwise state
+                case MOTOR_OFF2:
                     led_off(LED_BAR_LD1_IDX);
                     led_on(LED_BAR_LD2_IDX);
-                    motor_state = MOTOR_OFF1;  // Transition back to off state
+                    motor_state = MOTOR_CCW;    
+                    break;
+
+                //Transition back to off state
+                case MOTOR_CCW:
+                    led_off(LED_BAR_LD1_IDX);
+                    led_off(LED_BAR_LD2_IDX);
+                    motor_state = MOTOR_OFF1;   
                     break;
 
                 default:
                     break;
             }
-
-            debounce();
-
+            // Delay to ensure smooth operation
+            msec_delay(100);
             // Reset PB2 flag
             pb2_pressed = false;
         }
         
-        msec_delay(100);
+        
     }
 
     //Display "Program Stopped" when PB1 is pressed
     lcd_clear();
     lcd_write_string("Program Stopped");
-}
+} /* run_lab9_part1 */
 
 //-----------------------------------------------------------------------------
 // DESCRIPTION:
@@ -233,7 +236,7 @@ void config_pb1_interrupts(void)
 
     NVIC_SetPriority(GPIOB_INT_IRQn, 2);
     NVIC_EnableIRQ(GPIOB_INT_IRQn);
-}
+} /* config_pb1_interrupts */
 
 //-----------------------------------------------------------------------------
 // DESCRIPTION:
@@ -261,7 +264,7 @@ void config_pb2_interrupts(void)
 
     NVIC_SetPriority(GPIOA_INT_IRQn, 2);
     NVIC_EnableIRQ(GPIOA_INT_IRQn);
-}
+} /* config_pb2_interrupts */
 
 //-----------------------------------------------------------------------------
 // DESCRIPTION:
@@ -315,7 +318,7 @@ void GROUP1_IRQHandler(void)
                 break;
         }
     } while (group_iidx_status != 0);
-}
+} /* GROUP1_IRQHandler */
 
 //-----------------------------------------------------------------------------
 // DESCRIPTION:
@@ -333,4 +336,4 @@ void GROUP1_IRQHandler(void)
 // -----------------------------------------------------------------------------
 void debounce() {
     msec_delay(10);
-}
+} /* debounce */
