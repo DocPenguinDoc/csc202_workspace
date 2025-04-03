@@ -1,16 +1,24 @@
 //*****************************************************************************
 //*****************************    C Source Code    ***************************
 //*****************************************************************************
-//  DESIGNER NAME:  TBD
+//  DESIGNER NAME:  Connor Blum
 //
-//       LAB NAME:  TBD
+//       LAB NAME:  Lab 8
 //
-//      FILE NAME:  main.c
+//      FILE NAME:  lab8p3_main.c
 //
 //-----------------------------------------------------------------------------
 //
 // DESCRIPTION:
-//    This program serves as a ... 
+//    This program serves as a tester for the thermistor, utilizing the
+//    analog-to-digital converter (ADC). When PB2 is pushed, an interrupt
+//    reads the current temperature, and then it is displayed on line 2 of
+//    the LCD.
+//    This program also serves as a tester for the potentiometer, utilizing the
+//    analog-to-digital converter (ADC). The ADC reading is displayed on 
+//    the LCD, while the LED bar lights up representing the percentage the
+//    potentiometer has been rotated.
+//    The program can be ended with PB1, which is using an interrupt.
 //
 //*****************************************************************************
 //*****************************************************************************
@@ -43,7 +51,10 @@ void debounce(void);
 //-----------------------------------------------------------------------------
 // Define symbolic constants used by the program
 //-----------------------------------------------------------------------------
-
+#define POTENTIOMETER            7       //Potentiometer Channel (7)
+#define ADC_LED_DIVISOR          455     //ADC value range per LED (4096 / 9)
+#define LCD_ADDR_OFFSET          6       //Offset for LCD display of ADC value
+#define DEGREES                  0xDF    //Value for degree symbol on LCD
 
 //-----------------------------------------------------------------------------
 // Define global variables and structures here.
@@ -51,6 +62,7 @@ void debounce(void);
 //-----------------------------------------------------------------------------
 bool pb1_pressed = false;
 bool pb2_pressed = false;
+int therm_adc_value;
 
 
 // Define a structure to hold different data types
@@ -72,16 +84,7 @@ int main(void)
     config_pb2_interrupts();
     config_pb1_interrupts();
 
-    /*
-    //temp
-    while (1) {
-        lcd_write_quadbyte(ADC0_in(7));
-        msec_delay(100);
-        lcd_clear();
-    }
-    */
-
-    // PART 2
+    // PART 3
     run_lab8_part3();
  
     // Endless loop to prevent program from ending
@@ -90,48 +93,68 @@ int main(void)
 } /* main */
 
 //-----------------------------------------------------------------------------
-// Part 1: Display ADC value and toggle status based on light sensor
-//-----------------------------------------------------------------------------
+// DESCRIPTION:
+//    This function reads and displays the ADC value from the potentiometer.
+//    On the LCD screen, the ADC values displated.
+//    On the LED bar, the amount of lights lit correstponds to the percentage
+//    the potentiometer is turned.
+//    The interrupt PB1, will end the program.
+//    The interrupt PB2 will display the value of read using the ADC of the
+//    thermistor, and calculate & display the temperature in Fahrenheit
+//
+// INPUT PARAMETERS:
+//    none
+//
+// OUTPUT PARAMETERS:
+//    none
+//
+// RETURN:
+//    none
+//------------------------------------------------------------------------------
 void run_lab8_part3(void)
 {
     int adc_value;
-    // Loop until PB1 is pressed (pb1_pressed flag is set)
+    // Loop until PB1 is pressed
     while (!pb1_pressed)
     {
-        adc_value = ADC0_in(7);    //read channel 7 - light sensor
+        // Should implement interrupt disable?
+        adc_value = ADC0_in(POTENTIOMETER);
+        // Should implement interrupt re-enable?
 
         // Display ADC value on first line of LCD
         lcd_set_ddram_addr(LCD_LINE1_ADDR);
         lcd_write_string("ADC = ");
-        lcd_set_ddram_addr(LCD_LINE1_ADDR + 6);
+        lcd_set_ddram_addr(LCD_LINE1_ADDR + LCD_ADDR_OFFSET);
         lcd_write_doublebyte(adc_value);
 
-        uint8_t led_count = adc_value / 455;
-        //Loop through the LEDs and turn on appropriate amount
+        uint8_t led_count = adc_value / ADC_LED_DIVISOR;
+        // Loop through the LEDs and turn on appropriate amount
         for (uint8_t i = 0; i <= led_count; i++)
         {
             led_on(i);  // Turn on LED i
         }
-        //Turn off remaining LEDs
-        for (uint8_t i = led_count; i < 8; i++)
+        // Turn off remaining LEDs
+        for (uint8_t i = led_count; i < MAX_NUM_LEDS; i++)
         {
             led_off(i);  // Turn off LED i
         }
 
-        // Display temperature on second line of LCD
         while (pb2_pressed) 
         {  
-            adc_value = ADC0_in(5);
-            float temp_Celsius = thermistor_calc_temperature(adc_value);
+            //therm_adc_value = ADC0_in(5);      //Moved to Interrupt
+
+            // Calculate and display thermistor reading in Fahrenheit
+            float temp_Celsius = thermistor_calc_temperature(therm_adc_value);
             float temp_Fahrenheit = (temp_Celsius * 9 / 5) + 32;
             lcd_set_ddram_addr(LCD_LINE2_ADDR);
             lcd_write_string("Temp = ");
-            lcd_set_ddram_addr(LCD_LINE2_ADDR + 6);
-            lcd_write_doublebyte(temp_Fahrenheit);               //Print temp
-            lcd_write_string("degF");
+            lcd_set_ddram_addr(LCD_LINE2_ADDR + LCD_ADDR_OFFSET);
+            lcd_write_doublebyte(temp_Fahrenheit);
+            lcd_write_char(DEGREES);               
+            lcd_write_string("F");
             debounce();
 
-            //Reset PB2 flag
+            // Reset PB2 flag
             pb2_pressed = false;
         }
 
@@ -145,7 +168,17 @@ void run_lab8_part3(void)
 }
 
 //-----------------------------------------------------------------------------
-// Configures PB1 interrupt (GPIOB, DOI18)
+// DESCRIPTION:
+//    This function configures the PB1 interrupt (GPIOB, DOI18)
+//
+// INPUT PARAMETERS:
+//    none
+//
+// OUTPUT PARAMETERS:
+//    none
+//
+// RETURN:
+//    none
 //-----------------------------------------------------------------------------
 void config_pb1_interrupts(void)
 {
@@ -163,7 +196,17 @@ void config_pb1_interrupts(void)
 }
 
 //-----------------------------------------------------------------------------
-// Configures PB2 interrupt (GPIOA, DOI15)
+// DESCRIPTION:
+//    This function configures the PB2 interrupt (GPIOA, DOI15)
+//
+// INPUT PARAMETERS:
+//    none
+//
+// OUTPUT PARAMETERS:
+//    none
+//
+// RETURN:
+//    none
 //-----------------------------------------------------------------------------
 void config_pb2_interrupts(void)
 {
@@ -181,8 +224,18 @@ void config_pb2_interrupts(void)
 }
 
 //-----------------------------------------------------------------------------
-// GROUP1 Interrupt Handler (handles interrupts from GPIOA and GPIOB)
-//-----------------------------------------------------------------------------
+// DESCRIPTION:
+//    This function handles interrupts from GPIOA and GPIOB
+//
+// INPUT PARAMETERS:
+//    none
+//
+// OUTPUT PARAMETERS:
+//    none
+//
+// RETURN:
+//    none
+// -----------------------------------------------------------------------------
 void GROUP1_IRQHandler(void)
 {
     uint32_t group_iidx_status;
@@ -198,9 +251,11 @@ void GROUP1_IRQHandler(void)
             //Interrupt from GPIOA
             case (CPUSS_INT_GROUP_IIDX_STAT_INT0):
                 gpio_mis = GPIOA->CPU_INT.MIS;
-                if ((gpio_mis & GPIO_CPU_INT_MIS_DIO15_MASK) == GPIO_CPU_INT_MIS_DIO15_SET)
+                if ((   gpio_mis & GPIO_CPU_INT_MIS_DIO15_MASK) == 
+                        GPIO_CPU_INT_MIS_DIO15_SET)
                 {
                     pb2_pressed = true;
+                    therm_adc_value = ADC0_in(5);
                     //Manually clear bit to acknowledge interrupt
                     GPIOA->CPU_INT.ICLR = GPIO_CPU_INT_ICLR_DIO15_CLR;
                 }
@@ -208,7 +263,8 @@ void GROUP1_IRQHandler(void)
             //Interrupt from GPIOB
             case (CPUSS_INT_GROUP_IIDX_STAT_INT1):
                 gpio_mis = GPIOB->CPU_INT.MIS;
-                if ((gpio_mis & GPIO_CPU_INT_MIS_DIO18_MASK) == GPIO_CPU_INT_MIS_DIO18_SET)
+                if ((   gpio_mis & GPIO_CPU_INT_MIS_DIO18_MASK) == 
+                        GPIO_CPU_INT_MIS_DIO18_SET)
                 {
                     pb1_pressed = true;
                     //Manually clear bit to acknowledge interrupt
@@ -223,8 +279,19 @@ void GROUP1_IRQHandler(void)
 }
 
 //-----------------------------------------------------------------------------
-// Debounce: 10ms delay to prevent key bouncing
-//-----------------------------------------------------------------------------
+// DESCRIPTION:
+//    This function is a small 10ms delayed with the intention of preventing
+//    misread button presses as a result of bounding.
+//
+// INPUT PARAMETERS:
+//    none
+//
+// OUTPUT PARAMETERS:
+//    none
+//
+// RETURN:
+//    none
+// -----------------------------------------------------------------------------
 void debounce() {
     msec_delay(10);
 }

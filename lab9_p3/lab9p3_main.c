@@ -1,20 +1,16 @@
 //*****************************************************************************
 //*****************************    C Source Code    ***************************
 //*****************************************************************************
-//  DESIGNER NAME:  Connor Blum
+//  DESIGNER NAME:  TBD
 //
-//       LAB NAME:  Lab 8
+//       LAB NAME:  TBD
 //
-//      FILE NAME:  lab8p2_main.c
+//      FILE NAME:  main.c
 //
 //-----------------------------------------------------------------------------
 //
 // DESCRIPTION:
-//    This program serves as a tester for the potentiometer, utilizing the
-//    analog-to-digital converter (ADC). The ADC reading is displayed on 
-//    the LCD, while the LED bar lights up representing the percentage the
-//    potentiometer has been rotated.
-//    The program can be ended with PB1, which is using an interrupt.
+//    This program serves as a ... 
 //
 //*****************************************************************************
 //*****************************************************************************
@@ -34,22 +30,23 @@
 #include "adc.h"
 #include "ti/devices/msp/peripherals/hw_oa.h"
 
-
 //-----------------------------------------------------------------------------
 // Define function prototypes used by the program
 //-----------------------------------------------------------------------------
-void run_lab8_part2(void);              //Part 2 implementation
-void config_pb1_interrupts(void);       //Operational Amplifier initiliazation
-void config_pb2_interrupts(void);       //Pushbutton 2 interrupt configuration
-void GROUP1_IRQHandler(void);           //Interrupt handler
-void debounce(void);                    //Small 10ms delay
+void run_lab9_part3(void);
+void config_pb1_interrupts(void);
+void config_pb2_interrupts(void);
+void GROUP1_IRQHandler(void);
+void debounce(void);
 
 //-----------------------------------------------------------------------------
 // Define symbolic constants used by the program
 //-----------------------------------------------------------------------------
-#define POTENTIOMETER            7       //Potentiometer Channel (7)
-#define ADC_LED_DIVISOR          455     //ADC value range per LED (4096 / 9)
-#define LCD_ADDR_OFFSET          6       //Offset for LCD display of ADC value
+#define DEGREES                  0xDF    //Value for degree symbol on LCD
+#define MAX_ADC_VALUE            1023    //
+#define MIN_SERVO_COUNT          100     //
+#define MAX_SERVO_COUNT          500     //
+#define ADC_THRESHOLD            0.25    //
 
 //-----------------------------------------------------------------------------
 // Define global variables and structures here.
@@ -63,80 +60,80 @@ bool pb2_pressed = false;
 
 int main(void)
 {
+    uint16_t adc_pot_value = 0;
+    uint8_t switch_value = 0;
+    uint8_t duty_cycle = 0;
+
     //Configure Launchpad Boards
     clock_init_40mhz();
     launchpad_gpio_init();
+    dipsw_init();
     led_init();
     led_enable();
-    dipsw_init();
-    ADC0_init(ADC12_MEMCTL_VRSEL_INTREF_VSSA);
     I2C_init();
     lcd1602_init();
     lcd_clear();
+    keypad_init();
+
+    ADC0_init(ADC12_MEMCTL_VRSEL_INTREF_VSSA);
+
+    motor0_init();
+    motor0_pwm_init(4000,0);
+    motor0_pwm_enable();
 
     //Configure PB interrupts
     config_pb2_interrupts();
     config_pb1_interrupts();
 
-    // PART 2
-    run_lab8_part2();
+
+    run_lab9_part3();
  
-    // Endless loop to prevent program from ending
-    //while (1);
+ // Endless loop to prevent program from ending
+ //while (1);
 
 } /* main */
 
 //-----------------------------------------------------------------------------
-// DESCRIPTION:
-//    This function reads and displays the ADC value from the potentiometer.
-//    On the LCD screen, the ADC values displated.
-//    On the LED bar, the amount of lights lit correstponds to the percentage
-//    the potentiometer is turned.
-//    The interrupt PB1, will end the program.
-//
-// INPUT PARAMETERS:
-//    none
-//
-// OUTPUT PARAMETERS:
-//    none
-//
-// RETURN:
-//    none
-//------------------------------------------------------------------------------
-void run_lab8_part2(void)
+// PART 3: 
+//-----------------------------------------------------------------------------
+void run_lab9_part3(void)
 {
-    int adc_value;
-    // Loop until PB1 is pressed
-    while (!pb1_pressed)
-    {
-        adc_value = ADC0_in(POTENTIOMETER); 
+    uint16_t adc_value = 0;
+    uint16_t servo_count = 0;
 
-        // Display ADC value on first line of LCD
-        lcd_set_ddram_addr(LCD_LINE1_ADDR);
-        lcd_write_string("ADC = ");
-        lcd_set_ddram_addr(LCD_LINE1_ADDR + LCD_ADDR_OFFSET);
-        lcd_write_doublebyte(adc_value);
-        
-        //Calculate required quantity of LEDs to enable
-        uint8_t led_count = adc_value / ADC_LED_DIVISOR;
-        //Loop through the LEDs and turn on appropriate amount
-        for (uint8_t i = 0; i <= led_count; i++)
-        {
-            led_on(i);  // Turn on LED i
-        }
-        //Turn off remaining LEDs
-        for (uint8_t i = led_count; i < MAX_NUM_LEDS; i++)
-        {
-            led_off(i);  // Turn off LED i
-        }
-
-        // Prevent flashing
-        msec_delay(200);
-    }
-    
-    //Display "Program Stopped" when PB1 is pressed
+    lcd_write_string("Running Part 3");
+    msec_delay(1000);  // Short delay to display the message
     lcd_clear();
-    leds_off();
+
+    while (!pb1_pressed) {
+        //Read potentiometer
+        adc_value = ADC0_in(7);
+        
+        //Map ADC value (0-1023) to servo pulse width (100-500)
+        servo_count = (adc_value * (MAX_SERVO_COUNT - MIN_SERVO_COUNT)) / MAX_ADC_VALUE + MIN_SERVO_COUNT;
+
+        // Display ADC value on LCD (line 1)
+        lcd_set_ddram_addr(LCD_LINE1_ADDR);
+        lcd_write_string("ADC VAL = ");
+        lcd_write_doublebyte(adc_value);
+
+        // Display servo count on LCD (line 2)
+        lcd_set_ddram_addr(LCD_LINE2_ADDR);
+        lcd_write_string("SERVO # = ");
+        lcd_write_doublebyte(servo_count);
+
+        // Generate PWM signal for servo motor using servo count
+        // Timer configuration (we assume timer setup is done already)
+        // Assuming a timer running at 200 kHz, 100 counts = 0.5ms pulse width
+        motor0_set_pwm_count(servo_count);  // This function sets the PWM based on the calculated servo count
+
+        // Wait for 0.25 seconds (ADC stabilization delay)
+        msec_delay(250);
+    }
+
+    // Display "Program Stopped" when PB1 is pressed
+    lcd_clear();
+    lcd_set_ddram_addr(LCD_LINE1_ADDR);
     lcd_write_string("Program Stopped");
 }
 

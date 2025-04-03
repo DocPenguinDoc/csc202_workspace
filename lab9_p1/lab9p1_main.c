@@ -1,20 +1,16 @@
 //*****************************************************************************
 //*****************************    C Source Code    ***************************
 //*****************************************************************************
-//  DESIGNER NAME:  Connor Blum
+//  DESIGNER NAME:  TBD
 //
-//       LAB NAME:  Lab 8
+//       LAB NAME:  TBD
 //
-//      FILE NAME:  lab8p2_main.c
+//      FILE NAME:  main.c
 //
 //-----------------------------------------------------------------------------
 //
 // DESCRIPTION:
-//    This program serves as a tester for the potentiometer, utilizing the
-//    analog-to-digital converter (ADC). The ADC reading is displayed on 
-//    the LCD, while the LED bar lights up representing the percentage the
-//    potentiometer has been rotated.
-//    The program can be ended with PB1, which is using an interrupt.
+//    This program serves as a ... 
 //
 //*****************************************************************************
 //*****************************************************************************
@@ -34,22 +30,24 @@
 #include "adc.h"
 #include "ti/devices/msp/peripherals/hw_oa.h"
 
-
 //-----------------------------------------------------------------------------
 // Define function prototypes used by the program
 //-----------------------------------------------------------------------------
-void run_lab8_part2(void);              //Part 2 implementation
-void config_pb1_interrupts(void);       //Operational Amplifier initiliazation
-void config_pb2_interrupts(void);       //Pushbutton 2 interrupt configuration
-void GROUP1_IRQHandler(void);           //Interrupt handler
-void debounce(void);                    //Small 10ms delay
+void run_lab9_part1(void);
+void config_pb1_interrupts(void);
+void config_pb2_interrupts(void);
+void GROUP1_IRQHandler(void);
+void debounce(void);
 
 //-----------------------------------------------------------------------------
 // Define symbolic constants used by the program
 //-----------------------------------------------------------------------------
-#define POTENTIOMETER            7       //Potentiometer Channel (7)
-#define ADC_LED_DIVISOR          455     //ADC value range per LED (4096 / 9)
-#define LCD_ADDR_OFFSET          6       //Offset for LCD display of ADC value
+typedef enum {
+    MOTOR_OFF1,
+    MOTOR_CW,
+    MOTOR_OFF2,
+    MOTOR_CCW
+} motor_state_t;
 
 //-----------------------------------------------------------------------------
 // Define global variables and structures here.
@@ -57,6 +55,7 @@ void debounce(void);                    //Small 10ms delay
 //-----------------------------------------------------------------------------
 bool pb1_pressed = false;
 bool pb2_pressed = false;
+static motor_state_t motor_state = MOTOR_OFF1;
 
 
 // Define a structure to hold different data types
@@ -66,77 +65,145 @@ int main(void)
     //Configure Launchpad Boards
     clock_init_40mhz();
     launchpad_gpio_init();
+    dipsw_init();
     led_init();
     led_enable();
-    dipsw_init();
-    ADC0_init(ADC12_MEMCTL_VRSEL_INTREF_VSSA);
     I2C_init();
     lcd1602_init();
     lcd_clear();
+    keypad_init();
+
+    ADC0_init(ADC12_MEMCTL_VRSEL_INTREF_VSSA);
+
+    motor0_init();
+    motor0_pwm_init(4000,0);
+    motor0_pwm_enable();
 
     //Configure PB interrupts
     config_pb2_interrupts();
     config_pb1_interrupts();
 
-    // PART 2
-    run_lab8_part2();
+
+    /* Slides Example
+    uint16_t adc_pot_value = 0;
+    uint8_t switch_value = 0;
+    uint8_t duty_cycle = 0;
+
+    motor0_init();
+    motor0_pwm_init(4000,0);
+    motor0_pwm_enable();
+
+    
+    while (1)
+    {
+        switch_value = dipsw_read();
+        //adc_pot_value = ADC0_in(7);
+        //adc_pot_value >>= 2;
+        //duty_cycle = (adc_pot_value * 100) / 1024;
+        duty_cycle = 50;
+        motor0_set_pwm_dc(duty_cycle);
+        lcd_set_ddram_addr(LCD_LINE1_ADDR);
+        lcd_write_byte(duty_cycle);
+
+        if ((switch_value & 0x3) == 0x1)
+        {
+            led_on(LED_BAR_LD1_IDX);
+            led_off(LED_BAR_LD2_IDX);
+        }
+        else if ((switch_value & 0x3) == 0x2)
+        {
+            led_off(LED_BAR_LD1_IDX);
+            led_on(LED_BAR_LD2_IDX);
+        }
+        else
+        {
+            led_off(LED_BAR_LD1_IDX);
+            led_off(LED_BAR_LD2_IDX);
+        }
+    }
+    //*/
+
+    run_lab9_part1();
  
-    // Endless loop to prevent program from ending
-    //while (1);
+ // Endless loop to prevent program from ending
+ //while (1);
 
 } /* main */
 
 //-----------------------------------------------------------------------------
-// DESCRIPTION:
-//    This function reads and displays the ADC value from the potentiometer.
-//    On the LCD screen, the ADC values displated.
-//    On the LED bar, the amount of lights lit correstponds to the percentage
-//    the potentiometer is turned.
-//    The interrupt PB1, will end the program.
-//
-// INPUT PARAMETERS:
-//    none
-//
-// OUTPUT PARAMETERS:
-//    none
-//
-// RETURN:
-//    none
-//------------------------------------------------------------------------------
-void run_lab8_part2(void)
+// PART 1: 
+//-----------------------------------------------------------------------------
+void run_lab9_part1(void)
 {
-    int adc_value;
-    // Loop until PB1 is pressed
-    while (!pb1_pressed)
-    {
-        adc_value = ADC0_in(POTENTIOMETER); 
-
-        // Display ADC value on first line of LCD
-        lcd_set_ddram_addr(LCD_LINE1_ADDR);
-        lcd_write_string("ADC = ");
-        lcd_set_ddram_addr(LCD_LINE1_ADDR + LCD_ADDR_OFFSET);
-        lcd_write_doublebyte(adc_value);
-        
-        //Calculate required quantity of LEDs to enable
-        uint8_t led_count = adc_value / ADC_LED_DIVISOR;
-        //Loop through the LEDs and turn on appropriate amount
-        for (uint8_t i = 0; i <= led_count; i++)
-        {
-            led_on(i);  // Turn on LED i
-        }
-        //Turn off remaining LEDs
-        for (uint8_t i = led_count; i < MAX_NUM_LEDS; i++)
-        {
-            led_off(i);  // Turn off LED i
-        }
-
-        // Prevent flashing
-        msec_delay(200);
-    }
+    bool done = false;
+    uint8_t key;
+    uint8_t speed;
+    static motor_state_t motor_state = MOTOR_OFF1;
     
+    lcd_write_string("Running Part 1");
+    msec_delay(1000);
+    lcd_clear();
+
+    while (!pb1_pressed) {
+        lcd_set_ddram_addr(LCD_LINE1_ADDR + 2);
+        lcd_write_string("MOTOR SPEED");
+        key = keypad_scan();                //Scan for keypress
+        if (key != 0x10) {                  //Only runs after key presses         
+            speed = key * 100 / 15;
+            lcd_set_ddram_addr(LCD_LINE2_ADDR + 5);
+            lcd_write_byte(speed);          //Print speed
+            lcd_write_string("%");
+            motor0_set_pwm_dc(speed);
+            wait_no_key_pressed();          //Wait until key is released
+        }
+
+        while (pb2_pressed) 
+        {  
+            switch (motor_state) {
+                case MOTOR_OFF1:
+                    //motor0_pwm_disable();  // Turn off PWM to stop motor
+                    led_off(LED_BAR_LD1_IDX);
+                    led_off(LED_BAR_LD2_IDX);
+                    motor_state = MOTOR_CW;  // Transition to clockwise state
+                    break;
+
+                case MOTOR_CW:
+                    //motor0_pwm_enable();  // Enable PWM
+                    led_on(LED_BAR_LD1_IDX);
+                    led_off(LED_BAR_LD2_IDX);
+                    motor_state = MOTOR_OFF2;  // Transition to off state
+                    break;
+
+                case MOTOR_OFF2:
+                    //motor0_pwm_disable();  // Turn off PWM to stop motor
+                    led_off(LED_BAR_LD1_IDX);
+                    led_off(LED_BAR_LD2_IDX);
+                    motor_state = MOTOR_CCW;  // Transition to counterclockwise state
+                    break;
+
+                case MOTOR_CCW:
+                    // Motor runs counterclockwise
+                    //motor0_pwm_enable();  // Enable PWM
+                    led_off(LED_BAR_LD1_IDX);
+                    led_on(LED_BAR_LD2_IDX);
+                    motor_state = MOTOR_OFF1;  // Transition back to off state
+                    break;
+
+                default:
+                    break;
+            }
+
+            debounce();
+
+            // Reset PB2 flag
+            pb2_pressed = false;
+        }
+        
+        msec_delay(100);
+    }
+
     //Display "Program Stopped" when PB1 is pressed
     lcd_clear();
-    leds_off();
     lcd_write_string("Program Stopped");
 }
 

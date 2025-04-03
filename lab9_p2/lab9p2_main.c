@@ -1,20 +1,16 @@
 //*****************************************************************************
 //*****************************    C Source Code    ***************************
 //*****************************************************************************
-//  DESIGNER NAME:  Connor Blum
+//  DESIGNER NAME:  TBD
 //
-//       LAB NAME:  Lab 8
+//       LAB NAME:  TBD
 //
-//      FILE NAME:  lab8p2_main.c
+//      FILE NAME:  main.c
 //
 //-----------------------------------------------------------------------------
 //
 // DESCRIPTION:
-//    This program serves as a tester for the potentiometer, utilizing the
-//    analog-to-digital converter (ADC). The ADC reading is displayed on 
-//    the LCD, while the LED bar lights up representing the percentage the
-//    potentiometer has been rotated.
-//    The program can be ended with PB1, which is using an interrupt.
+//    This program serves as a ... 
 //
 //*****************************************************************************
 //*****************************************************************************
@@ -34,22 +30,19 @@
 #include "adc.h"
 #include "ti/devices/msp/peripherals/hw_oa.h"
 
-
 //-----------------------------------------------------------------------------
 // Define function prototypes used by the program
 //-----------------------------------------------------------------------------
-void run_lab8_part2(void);              //Part 2 implementation
-void config_pb1_interrupts(void);       //Operational Amplifier initiliazation
-void config_pb2_interrupts(void);       //Pushbutton 2 interrupt configuration
-void GROUP1_IRQHandler(void);           //Interrupt handler
-void debounce(void);                    //Small 10ms delay
+void run_lab9_part2(void);
+void config_pb1_interrupts(void);
+void config_pb2_interrupts(void);
+void GROUP1_IRQHandler(void);
+void debounce(void);
 
 //-----------------------------------------------------------------------------
 // Define symbolic constants used by the program
 //-----------------------------------------------------------------------------
-#define POTENTIOMETER            7       //Potentiometer Channel (7)
-#define ADC_LED_DIVISOR          455     //ADC value range per LED (4096 / 9)
-#define LCD_ADDR_OFFSET          6       //Offset for LCD display of ADC value
+#define DEGREES                  0xDF    //Value for degree symbol on LCD
 
 //-----------------------------------------------------------------------------
 // Define global variables and structures here.
@@ -63,80 +56,81 @@ bool pb2_pressed = false;
 
 int main(void)
 {
+    uint16_t adc_pot_value = 0;
+    uint8_t switch_value = 0;
+    uint8_t duty_cycle = 0;
+
     //Configure Launchpad Boards
     clock_init_40mhz();
     launchpad_gpio_init();
+    dipsw_init();
     led_init();
     led_enable();
-    dipsw_init();
-    ADC0_init(ADC12_MEMCTL_VRSEL_INTREF_VSSA);
     I2C_init();
     lcd1602_init();
     lcd_clear();
+    keypad_init();
+
+    ADC0_init(ADC12_MEMCTL_VRSEL_INTREF_VSSA);
+
+    motor0_init();
+    motor0_pwm_init(4000,0);
+    motor0_pwm_enable();
 
     //Configure PB interrupts
     config_pb2_interrupts();
     config_pb1_interrupts();
 
-    // PART 2
-    run_lab8_part2();
+
+    run_lab9_part2();
  
-    // Endless loop to prevent program from ending
-    //while (1);
+ // Endless loop to prevent program from ending
+ //while (1);
 
 } /* main */
 
 //-----------------------------------------------------------------------------
-// DESCRIPTION:
-//    This function reads and displays the ADC value from the potentiometer.
-//    On the LCD screen, the ADC values displated.
-//    On the LED bar, the amount of lights lit correstponds to the percentage
-//    the potentiometer is turned.
-//    The interrupt PB1, will end the program.
-//
-// INPUT PARAMETERS:
-//    none
-//
-// OUTPUT PARAMETERS:
-//    none
-//
-// RETURN:
-//    none
-//------------------------------------------------------------------------------
-void run_lab8_part2(void)
+// PART 2: 
+//-----------------------------------------------------------------------------
+void run_lab9_part2(void)
 {
-    int adc_value;
-    // Loop until PB1 is pressed
-    while (!pb1_pressed)
-    {
-        adc_value = ADC0_in(POTENTIOMETER); 
-
-        // Display ADC value on first line of LCD
-        lcd_set_ddram_addr(LCD_LINE1_ADDR);
-        lcd_write_string("ADC = ");
-        lcd_set_ddram_addr(LCD_LINE1_ADDR + LCD_ADDR_OFFSET);
-        lcd_write_doublebyte(adc_value);
-        
-        //Calculate required quantity of LEDs to enable
-        uint8_t led_count = adc_value / ADC_LED_DIVISOR;
-        //Loop through the LEDs and turn on appropriate amount
-        for (uint8_t i = 0; i <= led_count; i++)
-        {
-            led_on(i);  // Turn on LED i
-        }
-        //Turn off remaining LEDs
-        for (uint8_t i = led_count; i < MAX_NUM_LEDS; i++)
-        {
-            led_off(i);  // Turn off LED i
-        }
-
-        // Prevent flashing
-        msec_delay(200);
-    }
+    uint8_t speed;
+    int therm_adc_value;
     
+    lcd_write_string("Running Part 2");
+    msec_delay(1000);
+    lcd_clear();
+
+    while (!pb1_pressed) {
+        therm_adc_value = ADC0_in(5);
+        // Calculate and display thermistor reading in Fahrenheit
+        float temp_Celsius = thermistor_calc_temperature(therm_adc_value);
+        float temp_Fahrenheit = (temp_Celsius * 9 / 5) + 32;
+        lcd_set_ddram_addr(LCD_LINE1_ADDR + 1);
+        lcd_write_string("TEMP = ");
+        lcd_write_byte(temp_Fahrenheit);
+        lcd_write_char(DEGREES);               
+        lcd_write_string("F");
+
+        lcd_set_ddram_addr(LCD_LINE2_ADDR);
+        lcd_write_string("SPEED = ");
+        if (temp_Fahrenheit > 80)
+        {
+            speed = 80;
+        }
+        else 
+        {   
+            speed = 25;
+        }
+        motor0_set_pwm_dc(speed);
+        lcd_write_byte(speed);
+        lcd_write_string("%");        
+        
+        msec_delay(250);
+    }
+
     //Display "Program Stopped" when PB1 is pressed
     lcd_clear();
-    leds_off();
     lcd_write_string("Program Stopped");
 }
 
