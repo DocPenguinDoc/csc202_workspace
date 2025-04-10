@@ -20,7 +20,7 @@
 // HARDWARE REQUIREMENTS:
 //    - MSPM0G3507 Microcontroller
 //    - CSC202 Expansion Board
-//    - Pushbuttons 1 & 2
+//    - Pushbutton 1
 //    - LCD1602 module
 //    - L293D motor driver IC
 //    - DC Motor
