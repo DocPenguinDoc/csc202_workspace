@@ -10,7 +10,17 @@
 //-----------------------------------------------------------------------------
 //
 // DESCRIPTION:
-//    This program serves as a ... 
+//    This program serves as a test of the UART to demonstrate serial
+//    communication with the microcontroller. It does this by reading character
+//    inputs, echoing them to the serial terminal, and building a string which
+//    will be displayed to the LCD screen once ENTER is pressed. 
+//
+//-----------------------------------------------------------------------------
+//
+// HARDWARE REQUIREMENTS:
+//    - MSPM0G3507 Microcontroller
+//    - CSC202 Expansion Board
+//    - LCD1602 module
 //
 //*****************************************************************************
 //*****************************************************************************
@@ -34,12 +44,13 @@
 //-----------------------------------------------------------------------------
 // Define function prototypes used by the program
 //-----------------------------------------------------------------------------
-void run_lab10_part1(void);              //Part 1 implementation
+void run_lab10_part1(void);             //Part 1 implementation
 
 //-----------------------------------------------------------------------------
 // Define symbolic constants used by the program
 //-----------------------------------------------------------------------------
-
+#define MAX_SIZE        16              //Max buffer (string) size
+#define BAUD_RATE   115200              //UART Baud Rate
 
 //-----------------------------------------------------------------------------
 // Define global variables and structures here.
@@ -56,7 +67,7 @@ int main(void)
     launchpad_gpio_init();
     I2C_init();
     lcd1602_init();
-    UART_init(115200);
+    UART_init(BAUD_RATE);
     lcd_clear();
 
     // PART 1
@@ -69,7 +80,12 @@ int main(void)
 
 //-----------------------------------------------------------------------------
 // DESCRIPTION:
-//    TBD
+//    This function is as a test of the UART to demonstrate serial
+//    communication with the microcontroller. It does this by reading character
+//    inputs, echoing them to the serial terminal, and building a string which
+//    will be displayed to the LCD screen once ENTER is pressed. 
+//    The string is displayed after "NAME: " on line 1, while line 2 displays
+//    "Program Stopped".
 //
 // INPUT PARAMETERS:
 //    none
@@ -82,22 +98,24 @@ int main(void)
 //------------------------------------------------------------------------------
 void run_lab10_part1(void)
 {
-    char character;
-    char buffer[16];
-    uint8_t idx = 0;
-    bool done = false;
-
-    
+    char character;                 //User input character variable
+    char buffer[MAX_SIZE];          //String that will be filled & displayed
+    uint8_t idx = 0;                //Index counter to navigate string
+    bool done = false;              //Flag to end character inputs
 
     while(!done)
     {
+        //Read and push charcter input to serial terminal
         character = UART_in_char();
         UART_out_char(character);
+
+        //"ENTER" -> End While loop & Null terminate the string
         if (character == '\r')
         {
             done = true;
             buffer[idx] = '\0';
         }
+        //"BACKSPACE" -> Decrement the string (if there is anything)
         else if (character == '\b')
         {
             if (idx > 0)
@@ -105,12 +123,14 @@ void run_lab10_part1(void)
                 idx--;
             }
         }
+        //Else -> Add character to string, and increment index
         else
         {
             buffer[idx++] = character;
         }
     }
 
+    //Display "Name" (the input string) and "Program Stopped" to LCD
     lcd_set_ddram_addr(LCD_LINE1_ADDR);
     lcd_write_string("NAME:");
     lcd_write_string(buffer);
