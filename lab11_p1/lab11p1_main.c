@@ -1,16 +1,34 @@
 //*****************************************************************************
 //*****************************    C Source Code    ***************************
 //*****************************************************************************
-//  DESIGNER NAME:  TBD
+//  DESIGNER NAME:  Connor Blum
 //
-//       LAB NAME:  TBD
+//       LAB NAME:  Lab 11
 //
-//      FILE NAME:  main.c
+//      FILE NAME:  lab11p1_main.c
 //
 //-----------------------------------------------------------------------------
 //
 // DESCRIPTION:
-//    This program serves as a ... 
+//    This program uses a serial communication with the microcontroller to 
+//    create a synchronous serial interface. The Serial Peripheral Interface
+//    works with a shift register which displaying information (a 0-255 value)
+//    on an LED bar. The user is presented with 4 options in the Serial Console
+//    which they can select:
+//          Option 1. Set Data to Send
+//          Option 2. Send Data
+//          Option 3. Update LEDs
+//          Option 4. End Program
+//
+//-----------------------------------------------------------------------------
+//
+// HARDWARE REQUIREMENTS:
+//    - MSPM0G3507 Microcontroller
+//    - CSC202 Expansion Board
+//    - LCD1602 module
+//    - Serial Peripheral Interface
+//    - 74HC595 shift register
+//    - LED Bar (connected to shift register)
 //
 //*****************************************************************************
 //*****************************************************************************
@@ -36,19 +54,19 @@
 //-----------------------------------------------------------------------------
 // Define function prototypes used by the program
 //-----------------------------------------------------------------------------
-void run_lab11_part1(void);                     //Part 1 implementation
-void uart_print_string(const char *string);     //UART String Printer
-void shutdown_message(void);                    //Option 4 implementation
-uint16_t get_spi_data(void);                    //Set Data to send
-uint16_t string_to_uint16(const char *input_string);
-char* uint16_to_string(uint16_t value);
+void run_lab11_part1(void);                         //Part 1 implementation
+void uart_print_string(const char *string);         //UART String Printer
+void shutdown_message(void);                        //Option 4 implementation
+uint16_t get_spi_data(void);                        //Set and verify data
+uint16_t string_to_uint16(const char *input_string);//Convert string to uint16
+char* uint16_to_string(uint16_t value);             //Convert uint16 to string
 
 
 //-----------------------------------------------------------------------------
 // Define symbolic constants used by the program
 //-----------------------------------------------------------------------------
 #define BAUD_RATE      115200                   //UART Baud Rate
-#define DECIMAL_BASE   10
+#define DECIMAL_BASE   10                       //Using base-10 for inputs
 
 //-----------------------------------------------------------------------------
 // Define global variables and structures here.
@@ -70,33 +88,30 @@ int main(void)
     UART_init(BAUD_RATE);
     lcd_clear();
     spi1_init();
+
+    //Modify initialization of SPI
     IOMUX->SECCFG.PINCM[LP_SPI_CS0_IOMUX] = (IOMUX_PINCM_PC_CONNECTED |
                       IOMUX_PINCM23_PF_GPIOB_DIO06);
     GPIOB->DOE31_0 |= LP_SPI_CS0_MASK;
     GPIOB->DOUT31_0 &= ~LP_SPI_CS0_MASK;
 
-
-    //ADC0_init(ADC12_MEMCTL_VRSEL_INTREF_VSSA);
-    
-    // PART 2
-    run_lab11_part1();
-
-    //leds_off();
-    //seg7_off();
+    // PART 1
+    run_lab11_part1(); 
  
- 
- // Endless loop to prevent program from ending
- //while (1);
+    // Endless loop to prevent program from ending
+    //while (1);
 
 } /* main */
 
 //-----------------------------------------------------------------------------
 // DESCRIPTION:
-//    This function displays a user to the menu, serving as a test of TBD
-//          Option 1. TBD
-//          Option 2. TBD
-//          Option 3. TBD
-//          Option 4. TBD
+//    This function displays a user to the menu, demonstrating the Serial 
+//    Peripheral Interface, and shift register. The user is presented with
+//    four options:
+//          Option 1. Set Data to Send
+//          Option 2. Send Data
+//          Option 3. Update LEDs
+//          Option 4. End Program
 //
 // INPUT PARAMETERS:
 //    none
@@ -110,8 +125,8 @@ int main(void)
 void run_lab11_part1(void)
 {
     char input;                     //User input character variable
-    uint16_t data_input = 0;
-    uint8_t data_output = 0;
+    uint16_t data_input = 0;        //Data input variable
+    uint8_t data_output = 0;        //Data output variable
     bool done = false;              //Flag to end character inputs
 
     lcd_clear();
@@ -139,7 +154,7 @@ void run_lab11_part1(void)
         //User input 1-4 -> Run respective option
         if (input == '1')
         {
-            //Display confirmation message to Serial Console
+            //Display instructional message to Serial Console
             uart_print_string("\n\nSet SPI xmit data menu selected.");
             //Set SPI data
             data_input = get_spi_data();
@@ -168,9 +183,9 @@ void run_lab11_part1(void)
         }
         else if (input == '3')
         {
-            //text
+            //TBD
             GPIOB->DOUT31_0 |= LP_SPI_CS0_MASK;
-            msec_delay(5);
+            msec_delay(5);                                                                      //NUMBER NOT DEFINED
             GPIOB->DOUT31_0 &= ~LP_SPI_CS0_MASK;
             //Display confirmation message to Serial Console
             uart_print_string("\nLEDs Updated");
@@ -193,7 +208,9 @@ void run_lab11_part1(void)
 
 //-----------------------------------------------------------------------------
 // DESCRIPTION:
-//    TBD
+//    This function reads and validates a user input number of 0-255.
+//    They are presented an error message if they enter an invalid number or
+//    characters.
 //
 // INPUT PARAMETERS:
 //    none
@@ -206,45 +223,52 @@ void run_lab11_part1(void)
 //------------------------------------------------------------------------------
 uint16_t get_spi_data(void)
 {
-    char input_string[4]; // Assuming a 3-digit max input (0-255) + null terminator
-    int i = 0;
+    //intput_string has room for 3 digits and a null terminator
+    char input_string[4];                                                                               //NUMBER NOT DEFINED
+    int idx = 0;
     char input;
     bool done = false;
 
+    //Display instruction to Serial Console
     uart_print_string("\nEnter data to send (0-255): ");
     
-    while (i < 3 && !done) // Limit to 3 characters
+    //Stop reading after 3 characters, or ENTER is pushed
+    while (idx < 3 && !done)                                                                                    //NUMBER NOT DEFINED
     {
         input = UART_in_char();
         
-
-        if (input == '\r')  // Stop when user presses Enter
+        //ENTER -> Stop taking inputs
+        if (input == '\r')
         {
             done = true;
         }
-        else if (input >= '0' && input <= '9')  // Only accept numeric characters
+        //Numerical digit -> place in input_string
+        else if (input >= '0' && input <= '9')
         {
             UART_out_char(input);
-            input_string[i++] = input;
+            input_string[idx++] = input;
         }
+        //Otherwise, it's an invalid character
         else
         {
             uart_print_string("\nInvalid character, please enter a digit (0-9).");
         }
     }
 
-    input_string[i] = '\0'; // Null-terminate the string
-
+    //Null-terminate the string, and convert it to a uint16_t
+    input_string[idx] = '\0'; 
     uint16_t data = string_to_uint16(input_string);
 
-    if (data >= 0 && data <= 255)
+    //Validate the data is within bounds (0-255), and return it.
+    if (data >= 0 && data <= 255)                                                                   //NUMBER NOT DEFINED
     {
-        return data;  // Valid data between 0 and 255
+        return data;
     }
+    //Invalid data returns 0
     else
     {
         uart_print_string("\nERROR: Invalid data entered.");
-        return 0;  // Invalid input, return 0
+        return 0;
     }
 }
 
@@ -281,7 +305,7 @@ void shutdown_message(void)
 //                written to the DDRAM
 //
 // OUTPUT PARAMETERS:
-//    none
+//    TBD
 //
 // RETURN:
 //    none
@@ -298,13 +322,14 @@ void uart_print_string(const char *string)
 
 //-----------------------------------------------------------------------------
 // DESCRIPTION:
-//    TBD
+//    This function takes an string and converts it into a uint16_t value
 //
 // INPUT PARAMETERS:
-//    TBD
+//    string    - A pointer (address) to the null-terminated string to be 
+//                written to the DDRAM.   
 //
 // OUTPUT PARAMETERS:
-//    TBD
+//	  uint16_t - An unsigned integer value which comes from a string
 //
 // RETURN:
 //    none
@@ -313,66 +338,74 @@ uint16_t string_to_uint16(const char *input_string)
 {
     uint32_t result = 0;
 
+    //Iterate through input_string
     while (*input_string)
     {
-        if (*input_string < '0' || *input_string > '9')  // Check if it's a digit
+        //Specific char isn't a digit -> Return 0
+        if (*input_string < '0' || *input_string > '9')
         {
-            return 0;  // Return 0 if an invalid character is found
+            return 0;
         }
 
+        //Push result up 1 decimal place value, and add to 1's place
         result = result * DECIMAL_BASE + (*input_string - '0');
         input_string++;
     }
 
-    return (uint16_t)result;  // Return the converted value
+    //Convert result to a uint16_t
+    return (uint16_t)result;
 }
 
 
 //-----------------------------------------------------------------------------
 // DESCRIPTION:
-//    TBD
+//    This function takes an uint16_t value and converts it into a
+//    null-terminating string, which has 5 digits max.
 //
 // INPUT PARAMETERS:
-//    TBD
+//		uint16_t value - The provided value to be converted to a string
 //
 // OUTPUT PARAMETERS:
-//    TBD
+//    string    - A pointer (address) to the null-terminated string to be 
+//                written to the DDRAM.
 //
 // RETURN:
 //    none
 //------------------------------------------------------------------------------
 char* uint16_to_string(uint16_t value)
 {
-    static char output_string[6]; // 5 digits max + null terminator
+    //output_string has room for 5 digits and a null terminator
+    static char output_string[6];                                                                                       //NUMBER NOT DEFINED
     uint8_t digit_count = 0;
 
+    //value is 0 -> output_string is 0
     if (value == 0)
     {
         output_string[digit_count++] = '0';
     }
+    //Otherwise, convert value to string digit by digit
     else
     {
-        // Convert each digit to a string
         while (value > 0)
         {
+            //Convert final digit to a char
             output_string[digit_count++] = '0' + (value % DECIMAL_BASE);
+            //Remove final digit
             value /= DECIMAL_BASE;
         }
     }
-
+    //Append a null terminator
     output_string[digit_count] = '\0'; // Null-terminate the string
 
-    // Reverse the string to put digits in correct order
-    for (uint8_t i = 0; i < digit_count / 2; i++)
+    //Correct for string being in reverse order
+    for (uint8_t i = 0; i < digit_count / 2; i++)                                                               //NUMBER NOT DEFINED
     {
         char temp = output_string[i];
-        output_string[i] = output_string[digit_count - 1 - i];
-        output_string[digit_count - 1 - i] = temp;
+        output_string[i] = output_string[digit_count - 1 - i];                                                                  //NUMBER NOT DEFINED
+        output_string[digit_count - 1 - i] = temp;                                                                  //NUMBER NOT DEFINED
     }
 
     return output_string;
 }
-
-//From board
 
 
