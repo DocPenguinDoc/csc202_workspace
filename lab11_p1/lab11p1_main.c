@@ -12,7 +12,7 @@
 // DESCRIPTION:
 //    This program uses a serial communication with the microcontroller to 
 //    create a synchronous serial interface. The Serial Peripheral Interface
-//    works with a shift register which displaying information (a 0-255 value)
+//    sends an 8-bit value (0-255) to a shift register which is represented
 //    on an LED bar. The user is presented with 4 options in the Serial Console
 //    which they can select:
 //          Option 1. Set Data to Send
@@ -65,8 +65,12 @@ char* uint16_to_string(uint16_t value);             //Convert uint16 to string
 //-----------------------------------------------------------------------------
 // Define symbolic constants used by the program
 //-----------------------------------------------------------------------------
-#define BAUD_RATE      115200                   //UART Baud Rate
-#define DECIMAL_BASE   10                       //Using base-10 for inputs
+#define BAUD_RATE           115200                  //UART Baud Rate
+#define DECIMAL_BASE        10                      //Using base-10 for inputs
+#define INPUT_STRING_SIZE   4                       //Size of the input_string
+#define OUTPUT_STRING_SIZE  6                       //Size of the output_string
+#define DATA_MIN            0                       //Minimum size of data
+#define DATA_MAX            255                     //Maximum size of data
 
 //-----------------------------------------------------------------------------
 // Define global variables and structures here.
@@ -159,7 +163,7 @@ void run_lab11_part1(void)
             //Set SPI data
             data_input = get_spi_data();
             //Display confirmation message to Serial Console
-            uart_print_string("\nDPI data set to ");
+            uart_print_string("\nSPI data set to: ");
             uart_print_string(uint16_to_string(data_input));
         }
         else if (input == '2')
@@ -183,9 +187,9 @@ void run_lab11_part1(void)
         }
         else if (input == '3')
         {
-            //TBD
+            //Toggle chip select to trigger LED latch update
             GPIOB->DOUT31_0 |= LP_SPI_CS0_MASK;
-            msec_delay(5);                                                                      //NUMBER NOT DEFINED
+            msec_delay(INPUT_STRING_SIZE);
             GPIOB->DOUT31_0 &= ~LP_SPI_CS0_MASK;
             //Display confirmation message to Serial Console
             uart_print_string("\nLEDs Updated");
@@ -216,15 +220,15 @@ void run_lab11_part1(void)
 //    none
 //
 // OUTPUT PARAMETERS:
-//    none
+//    uint16_t - Validated 0-255 value which will be 0 if invalid.
 //
 // RETURN:
-//    none
+//    uint16_t
 //------------------------------------------------------------------------------
 uint16_t get_spi_data(void)
 {
-    //intput_string has room for 3 digits and a null terminator
-    char input_string[4];                                                                               //NUMBER NOT DEFINED
+    //input_string has room for 3 digits and a null terminator
+    char input_string[INPUT_STRING_SIZE];                   
     int idx = 0;
     char input;
     bool done = false;
@@ -233,7 +237,7 @@ uint16_t get_spi_data(void)
     uart_print_string("\nEnter data to send (0-255): ");
     
     //Stop reading after 3 characters, or ENTER is pushed
-    while (idx < 3 && !done)                                                                                    //NUMBER NOT DEFINED
+    while (idx < (INPUT_STRING_SIZE-1) && !done)
     {
         input = UART_in_char();
         
@@ -251,7 +255,8 @@ uint16_t get_spi_data(void)
         //Otherwise, it's an invalid character
         else
         {
-            uart_print_string("\nInvalid character, please enter a digit (0-9).");
+            uart_print_string(
+                "\nInvalid character, please enter a digit (0-9).");
         }
     }
 
@@ -260,7 +265,7 @@ uint16_t get_spi_data(void)
     uint16_t data = string_to_uint16(input_string);
 
     //Validate the data is within bounds (0-255), and return it.
-    if (data >= 0 && data <= 255)                                                                   //NUMBER NOT DEFINED
+    if (data >= DATA_MIN && data <= DATA_MAX)
     {
         return data;
     }
@@ -305,14 +310,14 @@ void shutdown_message(void)
 //                written to the DDRAM
 //
 // OUTPUT PARAMETERS:
-//    TBD
+//    none
 //
 // RETURN:
 //    none
 //------------------------------------------------------------------------------
 void uart_print_string(const char *string)
 {
-    //Print characters until a \0 is reached
+    //Print characters until a '\0' is reached
     while (*string != '\0')
     {
         //Print each character, and increment through string
@@ -332,7 +337,7 @@ void uart_print_string(const char *string)
 //	  uint16_t - An unsigned integer value which comes from a string
 //
 // RETURN:
-//    none
+//    uint16_t
 //------------------------------------------------------------------------------
 uint16_t string_to_uint16(const char *input_string)
 {
@@ -370,12 +375,12 @@ uint16_t string_to_uint16(const char *input_string)
 //                written to the DDRAM.
 //
 // RETURN:
-//    none
+//    string
 //------------------------------------------------------------------------------
 char* uint16_to_string(uint16_t value)
 {
     //output_string has room for 5 digits and a null terminator
-    static char output_string[6];                                                                                       //NUMBER NOT DEFINED
+    static char output_string[OUTPUT_STRING_SIZE];
     uint8_t digit_count = 0;
 
     //value is 0 -> output_string is 0
@@ -395,14 +400,14 @@ char* uint16_to_string(uint16_t value)
         }
     }
     //Append a null terminator
-    output_string[digit_count] = '\0'; // Null-terminate the string
+    output_string[digit_count] = '\0';
 
     //Correct for string being in reverse order
-    for (uint8_t i = 0; i < digit_count / 2; i++)                                                               //NUMBER NOT DEFINED
+    for (uint8_t i = 0; i < digit_count / 2; i++)
     {
         char temp = output_string[i];
-        output_string[i] = output_string[digit_count - 1 - i];                                                                  //NUMBER NOT DEFINED
-        output_string[digit_count - 1 - i] = temp;                                                                  //NUMBER NOT DEFINED
+        output_string[i] = output_string[digit_count - 1 - i];
+        output_string[digit_count - 1 - i] = temp;
     }
 
     return output_string;
